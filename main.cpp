@@ -4,7 +4,7 @@ import triangle_application;
 #include <exception>
 #include <iostream>
 
-int main(int argc, char **argv)
+int main(const int argc, char **argv)
 {
   (void)argc;
   (void)argv;

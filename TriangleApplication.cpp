@@ -1,3 +1,4 @@
+// ReSharper disable CppUseStructuredBinding
 module;
 
 #include <SDL3/SDL.h>
@@ -48,7 +49,7 @@ namespace
     std::ifstream file(path, std::ios::ate | std::ios::binary);
     if (!file.is_open())
     {
-      throw std::runtime_error("failed to open " + path);
+      throw std::runtime_error("kQw7nPz4Lm :: failed to open " + path);
     }
 
     const auto        fileSize = static_cast<size_t>(file.tellg());
@@ -56,14 +57,6 @@ namespace
     file.seekg(0);
     file.read(buffer.data(), static_cast<std::streamsize>(fileSize));
     return buffer;
-  }
-
-  void check(VkResult result, const char *message)
-  {
-    if (result != VK_SUCCESS)
-    {
-      throw std::runtime_error(message);
-    }
   }
 
   std::string executableBasePath()
@@ -123,13 +116,13 @@ struct TriangleApplication::Impl
   {
     if (!SDL_Init(SDL_INIT_VIDEO))
     {
-      throw std::runtime_error(SDL_GetError());
+      throw std::runtime_error(std::string("pR8mX2vNaQ :: ") + SDL_GetError());
     }
 
     window_ = SDL_CreateWindow("Vulkan Triangle", WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
     if (window_ == nullptr)
     {
-      throw std::runtime_error(SDL_GetError());
+      throw std::runtime_error(std::string("aT5sJ9qBvE :: ") + SDL_GetError());
     }
   }
 
@@ -207,7 +200,7 @@ struct TriangleApplication::Impl
     const char *const *extensions     = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
     if (extensions == nullptr)
     {
-      throw std::runtime_error(SDL_GetError());
+      throw std::runtime_error(std::string("hM4cV7nLxS :: ") + SDL_GetError());
     }
 
     VkInstanceCreateInfo createInfo{};
@@ -216,14 +209,17 @@ struct TriangleApplication::Impl
     createInfo.enabledExtensionCount   = extensionCount;
     createInfo.ppEnabledExtensionNames = extensions;
 
-    check(vkCreateInstance(&createInfo, nullptr, &instance_), "failed to create Vulkan instance");
+    if (vkCreateInstance(&createInfo, nullptr, &instance_) != VK_SUCCESS)
+    {
+      throw std::runtime_error("uF2dK8wYpC :: failed to create Vulkan instance");
+    }
   }
 
   void createSurface()
   {
     if (!SDL_Vulkan_CreateSurface(window_, instance_, nullptr, &surface_))
     {
-      throw std::runtime_error(SDL_GetError());
+      throw std::runtime_error(std::string("zN6rQ1tGmH :: ERROR IN `SDL_Vulkan_CreateSurface()`: ") + SDL_GetError());
     }
   }
 
@@ -233,7 +229,7 @@ struct TriangleApplication::Impl
     vkEnumeratePhysicalDevices(instance_, &deviceCount, nullptr);
     if (deviceCount == 0)
     {
-      throw std::runtime_error("failed to find GPUs with Vulkan support");
+      throw std::runtime_error("bL3xS9eRwD :: failed to find GPUs with Vulkan support");
     }
 
     std::vector<VkPhysicalDevice> devices(deviceCount);
@@ -250,11 +246,11 @@ struct TriangleApplication::Impl
 
     if (physicalDevice_ == VK_NULL_HANDLE)
     {
-      throw std::runtime_error("failed to find a suitable GPU");
+      throw std::runtime_error("ZGNjrNDGyX :: failed to find a suitable GPU");
     }
   }
 
-  bool isDeviceSuitable(VkPhysicalDevice device) const
+  bool isDeviceSuitable(const VkPhysicalDevice device) const
   {
     const QueueFamilyIndices indices             = findQueueFamilies(device);
     const bool               extensionsSupported = checkDeviceExtensionSupport(device);
@@ -269,7 +265,7 @@ struct TriangleApplication::Impl
     return indices.complete() && extensionsSupported && swapChainAdequate;
   }
 
-  bool checkDeviceExtensionSupport(VkPhysicalDevice device) const
+  static bool checkDeviceExtensionSupport(const VkPhysicalDevice device)
   {
     uint32_t extensionCount = 0;
     vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
@@ -278,7 +274,8 @@ struct TriangleApplication::Impl
     vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
 
     std::set<std::string> requiredExtensions(kDeviceExtensions.begin(), kDeviceExtensions.end());
-    for (const auto &extension : availableExtensions)
+    // ReSharper disable once CppUseStructuredBinding
+    for (const VkExtensionProperties &extension : availableExtensions)
     {
       requiredExtensions.erase(extension.extensionName);
     }
@@ -286,7 +283,7 @@ struct TriangleApplication::Impl
     return requiredExtensions.empty();
   }
 
-  QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) const
+  QueueFamilyIndices findQueueFamilies(const VkPhysicalDevice device) const
   {
     QueueFamilyIndices indices;
 
@@ -321,12 +318,15 @@ struct TriangleApplication::Impl
 
   void createLogicalDevice()
   {
+    // ReSharper disable once CppUseStructuredBinding
     const QueueFamilyIndices indices = findQueueFamilies(physicalDevice_);
 
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-    std::set<uint32_t>                   uniqueQueueFamilies = {*indices.graphicsFamily, *indices.presentFamily};
 
-    const float queuePriority = 1.0F;
+    // ReSharper disable once CppTemplateArgumentsCanBeDeduced
+    std::set<uint32_t> uniqueQueueFamilies = {*indices.graphicsFamily, *indices.presentFamily};
+
+    constexpr float queuePriority = 1.0F;
     for (uint32_t queueFamily : uniqueQueueFamilies)
     {
       VkDeviceQueueCreateInfo queueCreateInfo{};
@@ -347,13 +347,16 @@ struct TriangleApplication::Impl
     createInfo.enabledExtensionCount   = static_cast<uint32_t>(kDeviceExtensions.size());
     createInfo.ppEnabledExtensionNames = kDeviceExtensions.data();
 
-    check(vkCreateDevice(physicalDevice_, &createInfo, nullptr, &device_), "failed to create logical device");
+    if (vkCreateDevice(physicalDevice_, &createInfo, nullptr, &device_) != VK_SUCCESS)
+    {
+      throw std::runtime_error("cY7pD4nVaR :: failed to create logical device");
+    }
 
     vkGetDeviceQueue(device_, *indices.graphicsFamily, 0, &graphicsQueue_);
     vkGetDeviceQueue(device_, *indices.presentFamily, 0, &presentQueue_);
   }
 
-  SwapChainSupport querySwapChainSupport(VkPhysicalDevice device) const
+  SwapChainSupport querySwapChainSupport(const VkPhysicalDevice device) const
   {
     SwapChainSupport details;
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface_, &details.capabilities);
@@ -403,7 +406,7 @@ struct TriangleApplication::Impl
     return VK_PRESENT_MODE_FIFO_KHR;
   }
 
-  VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities)
+  [[nodiscard]] VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities) const
   {
     if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
     {
@@ -414,7 +417,7 @@ struct TriangleApplication::Impl
     int height = 0;
     if (!SDL_GetWindowSizeInPixels(window_, &width, &height))
     {
-      throw std::runtime_error(SDL_GetError());
+      throw std::runtime_error(std::string("mE9tH2wKsL :: ") + SDL_GetError());
     }
 
     VkExtent2D actualExtent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
@@ -426,13 +429,12 @@ struct TriangleApplication::Impl
 
   void createSwapChain()
   {
-    const SwapChainSupport swapChainSupport = querySwapChainSupport(physicalDevice_);
+    const SwapChainSupport   swapChainSupport = querySwapChainSupport(physicalDevice_);
+    const VkSurfaceFormatKHR surfaceFormat    = chooseSwapSurfaceFormat(swapChainSupport.formats);
+    const VkPresentModeKHR   presentMode      = chooseSwapPresentMode(swapChainSupport.presentModes);
+    const VkExtent2D         extent           = chooseSwapExtent(swapChainSupport.capabilities);
+    uint32_t                 imageCount       = swapChainSupport.capabilities.minImageCount + 1;
 
-    const VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
-    const VkPresentModeKHR   presentMode   = chooseSwapPresentMode(swapChainSupport.presentModes);
-    const VkExtent2D         extent        = chooseSwapExtent(swapChainSupport.capabilities);
-
-    uint32_t imageCount = swapChainSupport.capabilities.minImageCount + 1;
     if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount)
     {
       imageCount = swapChainSupport.capabilities.maxImageCount;
@@ -468,7 +470,10 @@ struct TriangleApplication::Impl
     createInfo.clipped        = VK_TRUE;
     createInfo.oldSwapchain   = VK_NULL_HANDLE;
 
-    check(vkCreateSwapchainKHR(device_, &createInfo, nullptr, &swapChain_), "failed to create swap chain");
+    if (vkCreateSwapchainKHR(device_, &createInfo, nullptr, &swapChain_) != VK_SUCCESS)
+    {
+      throw std::runtime_error("xV5qN8cTpJ :: failed to create swap chain");
+    }
 
     vkGetSwapchainImagesKHR(device_, swapChain_, &imageCount, nullptr);
     swapChainImages_.resize(imageCount);
@@ -499,7 +504,10 @@ struct TriangleApplication::Impl
       createInfo.subresourceRange.baseArrayLayer = 0;
       createInfo.subresourceRange.layerCount     = 1;
 
-      check(vkCreateImageView(device_, &createInfo, nullptr, &swapChainImageViews_[i]), "failed to create image views");
+      if (vkCreateImageView(device_, &createInfo, nullptr, &swapChainImageViews_[i]) != VK_SUCCESS)
+      {
+        throw std::runtime_error("rB1mF6zQeW :: failed to create image views");
+      }
     }
   }
 
@@ -540,10 +548,13 @@ struct TriangleApplication::Impl
     renderPassInfo.dependencyCount = 1;
     renderPassInfo.pDependencies   = &dependency;
 
-    check(vkCreateRenderPass(device_, &renderPassInfo, nullptr, &renderPass_), "failed to create render pass");
+    if (vkCreateRenderPass(device_, &renderPassInfo, nullptr, &renderPass_) != VK_SUCCESS)
+    {
+      throw std::runtime_error("nK8sP3yLdM :: failed to create render pass");
+    }
   }
 
-  VkShaderModule createShaderModule(const std::vector<char> &code) const
+  [[nodiscard]] VkShaderModule createShaderModule(const std::vector<char> &code) const
   {
     VkShaderModuleCreateInfo createInfo{};
     createInfo.sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -551,7 +562,10 @@ struct TriangleApplication::Impl
     createInfo.pCode    = reinterpret_cast<const uint32_t *>(code.data());
 
     VkShaderModule shaderModule = VK_NULL_HANDLE;
-    check(vkCreateShaderModule(device_, &createInfo, nullptr, &shaderModule), "failed to create shader module");
+    if (vkCreateShaderModule(device_, &createInfo, nullptr, &shaderModule) != VK_SUCCESS)
+    {
+      throw std::runtime_error("gW4vC9hTxN :: failed to create shader module");
+    }
     return shaderModule;
   }
 
@@ -633,7 +647,10 @@ struct TriangleApplication::Impl
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 
-    check(vkCreatePipelineLayout(device_, &pipelineLayoutInfo, nullptr, &pipelineLayout_), "failed to create pipeline layout");
+    if (vkCreatePipelineLayout(device_, &pipelineLayoutInfo, nullptr, &pipelineLayout_) != VK_SUCCESS)
+    {
+      throw std::runtime_error("dP6kR2mZaS :: failed to create pipeline layout");
+    }
 
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -649,7 +666,10 @@ struct TriangleApplication::Impl
     pipelineInfo.renderPass          = renderPass_;
     pipelineInfo.subpass             = 0;
 
-    check(vkCreateGraphicsPipelines(device_, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline_), "failed to create graphics pipeline");
+    if (vkCreateGraphicsPipelines(device_, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline_) != VK_SUCCESS)
+    {
+      throw std::runtime_error("yL9fV5qBnE :: failed to create graphics pipeline");
+    }
 
     vkDestroyShaderModule(device_, fragShaderModule, nullptr);
     vkDestroyShaderModule(device_, vertShaderModule, nullptr);
@@ -661,7 +681,7 @@ struct TriangleApplication::Impl
 
     for (size_t i = 0; i < swapChainImageViews_.size(); ++i)
     {
-      VkImageView attachments[] = {swapChainImageViews_[i]};
+      const VkImageView attachments[] = {swapChainImageViews_[i]};
 
       VkFramebufferCreateInfo framebufferInfo{};
       framebufferInfo.sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
@@ -672,7 +692,10 @@ struct TriangleApplication::Impl
       framebufferInfo.height          = swapChainExtent_.height;
       framebufferInfo.layers          = 1;
 
-      check(vkCreateFramebuffer(device_, &framebufferInfo, nullptr, &swapChainFramebuffers_[i]), "failed to create framebuffer");
+      if (vkCreateFramebuffer(device_, &framebufferInfo, nullptr, &swapChainFramebuffers_[i]) != VK_SUCCESS)
+      {
+        throw std::runtime_error("tH3wX8cJpQ :: failed to create framebuffer");
+      }
     }
   }
 
@@ -685,7 +708,10 @@ struct TriangleApplication::Impl
     poolInfo.flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     poolInfo.queueFamilyIndex = *queueFamilyIndices.graphicsFamily;
 
-    check(vkCreateCommandPool(device_, &poolInfo, nullptr, &commandPool_), "failed to create command pool");
+    if (vkCreateCommandPool(device_, &poolInfo, nullptr, &commandPool_) != VK_SUCCESS)
+    {
+      throw std::runtime_error("sM7nD1vKgR :: failed to create command pool");
+    }
   }
 
   void createCommandBuffers()
@@ -698,15 +724,21 @@ struct TriangleApplication::Impl
     allocInfo.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     allocInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers_.size());
 
-    check(vkAllocateCommandBuffers(device_, &allocInfo, commandBuffers_.data()), "failed to allocate command buffers");
+    if (vkAllocateCommandBuffers(device_, &allocInfo, commandBuffers_.data()) != VK_SUCCESS)
+    {
+      throw std::runtime_error("vC2pL9yWtF :: failed to allocate command buffers");
+    }
   }
 
-  void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex) const
+  void recordCommandBuffer(const VkCommandBuffer commandBuffer, const uint32_t imageIndex) const
   {
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
-    check(vkBeginCommandBuffer(commandBuffer, &beginInfo), "failed to begin recording command buffer");
+    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS)
+    {
+      throw std::runtime_error("qN5eZ8rHsB :: failed to begin recording command buffer");
+    }
 
     VkRenderPassBeginInfo renderPassInfo{};
     renderPassInfo.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -715,16 +747,19 @@ struct TriangleApplication::Impl
     renderPassInfo.renderArea.offset = {0, 0};
     renderPassInfo.renderArea.extent = swapChainExtent_;
 
-    const VkClearValue clearColor  = {{{0.02F, 0.03F, 0.05F, 1.0F}}};
-    renderPassInfo.clearValueCount = 1;
-    renderPassInfo.pClearValues    = &clearColor;
+    constexpr VkClearValue clearColor = {{{0.02F, 0.03F, 0.05F, 1.0F}}};
+    renderPassInfo.clearValueCount    = 1;
+    renderPassInfo.pClearValues       = &clearColor;
 
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
     vkCmdDraw(commandBuffer, 3, 1, 0, 0);
     vkCmdEndRenderPass(commandBuffer);
 
-    check(vkEndCommandBuffer(commandBuffer), "failed to record command buffer");
+    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
+    {
+      throw std::runtime_error("wJ4tK6mPxV :: failed to record command buffer");
+    }
   }
 
   void createSyncObjects()
@@ -742,9 +777,20 @@ struct TriangleApplication::Impl
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
     {
-      check(vkCreateSemaphore(device_, &semaphoreInfo, nullptr, &imageAvailableSemaphores_[i]), "failed to create image-available semaphore");
-      check(vkCreateSemaphore(device_, &semaphoreInfo, nullptr, &renderFinishedSemaphores_[i]), "failed to create render-finished semaphore");
-      check(vkCreateFence(device_, &fenceInfo, nullptr, &inFlightFences_[i]), "failed to create in-flight fence");
+      if (vkCreateSemaphore(device_, &semaphoreInfo, nullptr, &imageAvailableSemaphores_[i]) != VK_SUCCESS)
+      {
+        throw std::runtime_error("eR8sB2qNyT :: failed to create image-available semaphore");
+      }
+
+      if (vkCreateSemaphore(device_, &semaphoreInfo, nullptr, &renderFinishedSemaphores_[i]) != VK_SUCCESS)
+      {
+        throw std::runtime_error("lD5vH9cWmK :: failed to create render-finished semaphore");
+      }
+
+      if (vkCreateFence(device_, &fenceInfo, nullptr, &inFlightFences_[i]) != VK_SUCCESS)
+      {
+        throw std::runtime_error("pX1kT7zQaF :: failed to create in-flight fence");
+      }
     }
   }
 
@@ -762,16 +808,16 @@ struct TriangleApplication::Impl
     }
     if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
     {
-      throw std::runtime_error("failed to acquire swap chain image");
+      throw std::runtime_error("cM6yV3nLdP :: failed to acquire swap chain image");
     }
 
     vkResetFences(device_, 1, &inFlightFences_[currentFrame_]);
     vkResetCommandBuffer(commandBuffers_[currentFrame_], 0);
     recordCommandBuffer(commandBuffers_[currentFrame_], imageIndex);
 
-    VkSemaphore          waitSemaphores[]   = {imageAvailableSemaphores_[currentFrame_]};
-    VkPipelineStageFlags waitStages[]       = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-    VkSemaphore          signalSemaphores[] = {renderFinishedSemaphores_[currentFrame_]};
+    const VkSemaphore              waitSemaphores[]   = {imageAvailableSemaphores_[currentFrame_]};
+    constexpr VkPipelineStageFlags waitStages[]       = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    const VkSemaphore              signalSemaphores[] = {renderFinishedSemaphores_[currentFrame_]};
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -783,7 +829,10 @@ struct TriangleApplication::Impl
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores    = signalSemaphores;
 
-    check(vkQueueSubmit(graphicsQueue_, 1, &submitInfo, inFlightFences_[currentFrame_]), "failed to submit draw command buffer");
+    if (vkQueueSubmit(graphicsQueue_, 1, &submitInfo, inFlightFences_[currentFrame_]) != VK_SUCCESS)
+    {
+      throw std::runtime_error("aW9qE4sVrN :: failed to submit draw command buffer");
+    }
 
     VkPresentInfoKHR presentInfo{};
     presentInfo.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -801,7 +850,7 @@ struct TriangleApplication::Impl
     }
     else if (result != VK_SUCCESS)
     {
-      throw std::runtime_error("failed to present swap chain image");
+      throw std::runtime_error("hT2pK8mJxC :: failed to present swap chain image");
     }
 
     currentFrame_ = (currentFrame_ + 1) % MAX_FRAMES_IN_FLIGHT;
@@ -866,6 +915,7 @@ TriangleApplication::~TriangleApplication()
   delete impl_;
 }
 
+// ReSharper disable once CppMemberFunctionMayBeConst
 void TriangleApplication::run()
 {
   impl_->run();
