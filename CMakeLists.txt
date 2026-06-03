@@ -42,6 +42,10 @@ target_sources(
 )
 add_dependencies(probe_vulkan compile_shaders)
 
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 23)
+  target_compile_options(probe_vulkan PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-std=c++2c>)
+endif()
+
 target_link_libraries(
   probe_vulkan
   PRIVATE
