@@ -20,14 +20,20 @@ target_sources(
   src/utils.cppm
 )
 
+file(GLOB_RECURSE RUNTIME_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/files/*)
+
 add_custom_command(
-  TARGET probe_vulkan
-  POST_BUILD
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/copy_runtime_files.stamp
   COMMAND ${CMAKE_COMMAND} -E copy_directory
     ${CMAKE_CURRENT_SOURCE_DIR}/files
     $<TARGET_FILE_DIR:probe_vulkan>
+  COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/copy_runtime_files.stamp
+  DEPENDS ${RUNTIME_FILES}
   VERBATIM
 )
+
+add_custom_target(copy_runtime_files DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/copy_runtime_files.stamp)
+add_dependencies(probe_vulkan copy_runtime_files)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 23)
   target_compile_options(probe_vulkan PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-std=c++2c>)
