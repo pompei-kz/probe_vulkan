@@ -10,6 +10,7 @@ module;
 #include <filesystem>
 #include <fstream>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <set>
 #include <stdexcept>
@@ -1051,14 +1052,11 @@ struct TriangleApplication::Impl
 };
 
 TriangleApplication::TriangleApplication()
-    : impl_(new Impl)
+    : impl_(std::make_unique<Impl>())
 {
 }
 
-TriangleApplication::~TriangleApplication()
-{
-  delete impl_;
-}
+TriangleApplication::~TriangleApplication() = default;
 
 // ReSharper disable once CppMemberFunctionMayBeConst
 void TriangleApplication::run()
