@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Vulkan REQUIRED)
-find_package(SDL2 REQUIRED)
+find_package(SDL3 REQUIRED)
 
 find_program(GLSLANG_VALIDATOR glslangValidator REQUIRED)
 
@@ -37,5 +37,5 @@ target_link_libraries(
   probe_vulkan
   PRIVATE
   Vulkan::Vulkan
-  SDL2::SDL2
+  SDL3::SDL3
 )

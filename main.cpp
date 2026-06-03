@@ -1,5 +1,5 @@
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_vulkan.h>
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_vulkan.h>
 #include <vulkan/vulkan.h>
 
 #include <algorithm>
@@ -21,6 +21,7 @@ namespace
   constexpr int WINDOW_HEIGHT        = 600;
   constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
+  // ReSharper disable once CppTemplateArgumentsCanBeDeduced
   const std::vector<const char *> kDeviceExtensions = {
       VK_KHR_SWAPCHAIN_EXTENSION_NAME,
   };
@@ -65,15 +66,13 @@ namespace
 
   std::string executableBasePath()
   {
-    char *basePath = SDL_GetBasePath();
+    const char *basePath = SDL_GetBasePath();
     if (basePath == nullptr)
     {
       return "";
     }
 
-    std::string result(basePath);
-    SDL_free(basePath);
-    return result;
+    return basePath;
   }
 
   class TriangleApplication
@@ -120,17 +119,12 @@ namespace
 
     void initWindow()
     {
-      if (SDL_Init(SDL_INIT_VIDEO) != 0)
+      if (!SDL_Init(SDL_INIT_VIDEO))
       {
         throw std::runtime_error(SDL_GetError());
       }
 
-      window_ = SDL_CreateWindow("Vulkan Triangle",
-                                 SDL_WINDOWPOS_CENTERED,
-                                 SDL_WINDOWPOS_CENTERED,
-                                 WINDOW_WIDTH,
-                                 WINDOW_HEIGHT,
-                                 SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
+      window_ = SDL_CreateWindow("Vulkan Triangle", WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
       if (window_ == nullptr)
       {
         throw std::runtime_error(SDL_GetError());
@@ -161,11 +155,11 @@ namespace
         SDL_Event event{};
         while (SDL_PollEvent(&event) != 0)
         {
-          if (event.type == SDL_QUIT)
+          if (event.type == SDL_EVENT_QUIT)
           {
             quit = true;
           }
-          else if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED)
+          else if (event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED)
           {
             framebufferResized_ = true;
           }
@@ -190,7 +184,7 @@ namespace
 
       vkDestroyCommandPool(device_, commandPool_, nullptr);
       vkDestroyDevice(device_, nullptr);
-      vkDestroySurfaceKHR(instance_, surface_, nullptr);
+      SDL_Vulkan_DestroySurface(instance_, surface_, nullptr);
       vkDestroyInstance(instance_, nullptr);
 
       SDL_DestroyWindow(window_);
@@ -207,14 +201,9 @@ namespace
       appInfo.engineVersion      = VK_MAKE_VERSION(1, 0, 0);
       appInfo.apiVersion         = VK_API_VERSION_1_0;
 
-      unsigned int extensionCount = 0;
-      if (SDL_Vulkan_GetInstanceExtensions(window_, &extensionCount, nullptr) != SDL_TRUE)
-      {
-        throw std::runtime_error(SDL_GetError());
-      }
-
-      std::vector<const char *> extensions(extensionCount);
-      if (SDL_Vulkan_GetInstanceExtensions(window_, &extensionCount, extensions.data()) != SDL_TRUE)
+      Uint32             extensionCount = 0;
+      const char *const *extensions     = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
+      if (extensions == nullptr)
       {
         throw std::runtime_error(SDL_GetError());
       }
@@ -222,15 +211,15 @@ namespace
       VkInstanceCreateInfo createInfo{};
       createInfo.sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
       createInfo.pApplicationInfo        = &appInfo;
-      createInfo.enabledExtensionCount   = static_cast<uint32_t>(extensions.size());
-      createInfo.ppEnabledExtensionNames = extensions.data();
+      createInfo.enabledExtensionCount   = extensionCount;
+      createInfo.ppEnabledExtensionNames = extensions;
 
       check(vkCreateInstance(&createInfo, nullptr, &instance_), "failed to create Vulkan instance");
     }
 
     void createSurface()
     {
-      if (SDL_Vulkan_CreateSurface(window_, instance_, &surface_) != SDL_TRUE)
+      if (!SDL_Vulkan_CreateSurface(window_, instance_, nullptr, &surface_))
       {
         throw std::runtime_error(SDL_GetError());
       }
@@ -421,7 +410,10 @@ namespace
 
       int width  = 0;
       int height = 0;
-      SDL_Vulkan_GetDrawableSize(window_, &width, &height);
+      if (!SDL_GetWindowSizeInPixels(window_, &width, &height))
+      {
+        throw std::runtime_error(SDL_GetError());
+      }
 
       VkExtent2D actualExtent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
       actualExtent.width      = std::clamp(actualExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
@@ -817,11 +809,11 @@ namespace
     {
       int width  = 0;
       int height = 0;
-      SDL_Vulkan_GetDrawableSize(window_, &width, &height);
+      SDL_GetWindowSizeInPixels(window_, &width, &height);
       while (width == 0 || height == 0)
       {
         SDL_WaitEvent(nullptr);
-        SDL_Vulkan_GetDrawableSize(window_, &width, &height);
+        SDL_GetWindowSizeInPixels(window_, &width, &height);
       }
 
       vkDeviceWaitIdle(device_);
