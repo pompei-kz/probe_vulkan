@@ -18,6 +18,8 @@ module;
 
 module triangle_application;
 
+import utils;
+
 namespace
 {
 
@@ -26,6 +28,7 @@ namespace
   constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
   // ReSharper disable once CppTemplateArgumentsCanBeDeduced
+  // ReSharper disable once CppVariableCanBeMadeConstexpr
   const std::vector<const char *> kDeviceExtensions = {
       VK_KHR_SWAPCHAIN_EXTENSION_NAME,
   };
@@ -40,7 +43,7 @@ namespace
 
   struct SwapChainSupport
   {
-    // Храним ограничения поверхности Vulkan для выбора параметров swapchain.
+    // Храним ограничения поверхности Vulkan для выбора параметров swap-chain.
     VkSurfaceCapabilitiesKHR capabilities{};
     // Доступные форматы поверхности Vulkan.
     std::vector<VkSurfaceFormatKHR> formats;
@@ -51,28 +54,17 @@ namespace
   std::vector<char> readFile(const std::filesystem::path &path)
   {
     std::ifstream file(path, std::ios::ate | std::ios::binary);
+
     if (!file.is_open())
     {
       throw std::runtime_error("kQw7nPz4Lm :: failed to open " + path.string());
     }
 
-    const auto        fileSize = static_cast<size_t>(file.tellg());
+    const size_t      fileSize = file.tellg();
     std::vector<char> buffer(fileSize);
     file.seekg(0);
     file.read(buffer.data(), static_cast<std::streamsize>(fileSize));
     return buffer;
-  }
-
-  std::filesystem::path executableBasePath()
-  {
-    // Получаем путь к каталогу исполняемого файла через SDL.
-    const char *basePath = SDL_GetBasePath();
-    if (basePath == nullptr)
-    {
-      return {};
-    }
-
-    return std::filesystem::path(basePath);
   }
 
 } // namespace
@@ -97,13 +89,13 @@ struct TriangleApplication::Impl
 
   // Дескриптор цепочки обмена Vulkan.
   VkSwapchainKHR swapChain_ = VK_NULL_HANDLE;
-  // Изображения swapchain Vulkan.
+  // Изображения swap-chain Vulkan.
   std::vector<VkImage> swapChainImages_;
-  // Формат изображений swapchain Vulkan.
+  // Формат изображений swap-chain Vulkan.
   VkFormat swapChainImageFormat_ = VK_FORMAT_UNDEFINED;
-  // Размер изображений swapchain Vulkan.
+  // Размер изображений swap-chain Vulkan.
   VkExtent2D swapChainExtent_{};
-  // Image views Vulkan для изображений swapchain.
+  // Image views Vulkan для изображений swap-chain.
   std::vector<VkImageView> swapChainImageViews_;
   // Framebuffers Vulkan для render pass.
   std::vector<VkFramebuffer> swapChainFramebuffers_;
@@ -139,7 +131,7 @@ struct TriangleApplication::Impl
 
   void initWindow()
   {
-    // Инициализируем видеоподсистему SDL.
+    // Инициализируем видео-подсистему SDL.
     if (!SDL_Init(SDL_INIT_VIDEO))
     {
       // Получаем текст ошибки SDL.
@@ -424,7 +416,7 @@ struct TriangleApplication::Impl
   SwapChainSupport querySwapChainSupport(const VkPhysicalDevice device) const
   {
     SwapChainSupport details;
-    // Получаем ограничения Vulkan surface для swapchain.
+    // Получаем ограничения Vulkan surface для swap-chain.
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface_, &details.capabilities);
 
     uint32_t formatCount = 0;
@@ -492,7 +484,7 @@ struct TriangleApplication::Impl
       throw std::runtime_error(std::string("mE9tH2wKsL :: ") + SDL_GetError());
     }
 
-    // Фактический размер swapchain Vulkan.
+    // Фактический размер swap-chain Vulkan.
     VkExtent2D actualExtent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
     actualExtent.width      = std::clamp(actualExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
     actualExtent.height     = std::clamp(actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
@@ -507,7 +499,7 @@ struct TriangleApplication::Impl
     const VkSurfaceFormatKHR surfaceFormat  = chooseSwapSurfaceFormat(swapChainSupport.formats);
     // Выбранный режим показа Vulkan.
     const VkPresentModeKHR presentMode      = chooseSwapPresentMode(swapChainSupport.presentModes);
-    // Выбранный размер swapchain Vulkan.
+    // Выбранный размер swap-chain Vulkan.
     const VkExtent2D extent                 = chooseSwapExtent(swapChainSupport.capabilities);
     uint32_t         imageCount             = swapChainSupport.capabilities.minImageCount + 1;
 
@@ -516,7 +508,7 @@ struct TriangleApplication::Impl
       imageCount = swapChainSupport.capabilities.maxImageCount;
     }
 
-    // Параметры создания swapchain Vulkan.
+    // Параметры создания swap-chain Vulkan.
     VkSwapchainCreateInfoKHR createInfo{};
     createInfo.sType            = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     createInfo.surface          = surface_;
@@ -547,16 +539,16 @@ struct TriangleApplication::Impl
     createInfo.clipped        = VK_TRUE;
     createInfo.oldSwapchain   = VK_NULL_HANDLE;
 
-    // Создаем swapchain Vulkan.
+    // Создаем swap-chain Vulkan.
     if (vkCreateSwapchainKHR(device_, &createInfo, nullptr, &swapChain_) != VK_SUCCESS)
     {
       throw std::runtime_error("xV5qN8cTpJ :: failed to create swap chain");
     }
 
-    // Запрашиваем количество изображений swapchain Vulkan.
+    // Запрашиваем количество изображений swap-chain Vulkan.
     vkGetSwapchainImagesKHR(device_, swapChain_, &imageCount, nullptr);
     swapChainImages_.resize(imageCount);
-    // Получаем изображения swapchain Vulkan.
+    // Получаем изображения swap-chain Vulkan.
     vkGetSwapchainImagesKHR(device_, swapChain_, &imageCount, swapChainImages_.data());
 
     swapChainImageFormat_ = surfaceFormat.format;
@@ -585,7 +577,7 @@ struct TriangleApplication::Impl
       createInfo.subresourceRange.baseArrayLayer = 0;
       createInfo.subresourceRange.layerCount     = 1;
 
-      // Создаем image view Vulkan для изображения swapchain.
+      // Создаем image view Vulkan для изображения swap-chain.
       if (vkCreateImageView(device_, &createInfo, nullptr, &swapChainImageViews_[i]) != VK_SUCCESS)
       {
         throw std::runtime_error("rB1mF6zQeW :: failed to create image views");
@@ -932,7 +924,7 @@ struct TriangleApplication::Impl
     vkWaitForFences(device_, 1, &inFlightFences_[currentFrame_], VK_TRUE, UINT64_MAX);
 
     uint32_t imageIndex = 0;
-    // Получаем следующее изображение swapchain Vulkan.
+    // Получаем следующее изображение swap-chain Vulkan.
     VkResult result = vkAcquireNextImageKHR(device_, swapChain_, UINT64_MAX, imageAvailableSemaphores_[currentFrame_], VK_NULL_HANDLE, &imageIndex);
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR)
@@ -984,7 +976,7 @@ struct TriangleApplication::Impl
     presentInfo.pSwapchains        = &swapChain_;
     presentInfo.pImageIndices      = &imageIndex;
 
-    // Показываем изображение swapchain Vulkan.
+    // Показываем изображение swap-chain Vulkan.
     result = vkQueuePresentKHR(presentQueue_, &presentInfo);
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized_)
     {
@@ -1013,7 +1005,7 @@ struct TriangleApplication::Impl
       SDL_GetWindowSizeInPixels(window_, &width, &height);
     }
 
-    // Ждем завершения операций устройства Vulkan перед пересозданием swapchain.
+    // Ждем завершения операций устройства Vulkan перед пересозданием swap-chain.
     vkDeviceWaitIdle(device_);
     cleanupSwapChain();
 
@@ -1052,7 +1044,7 @@ struct TriangleApplication::Impl
     }
     swapChainImageViews_.clear();
 
-    // Уничтожаем swapchain Vulkan.
+    // Уничтожаем swap-chain Vulkan.
     vkDestroySwapchainKHR(device_, swapChain_, nullptr);
     swapChain_ = VK_NULL_HANDLE;
   }

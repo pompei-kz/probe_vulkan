@@ -38,6 +38,7 @@ target_sources(
   FILE_SET CXX_MODULES
   FILES
   src/TriangleApplication.cppm
+  src/utils.cppm
 )
 add_dependencies(probe_vulkan compile_shaders)
 
