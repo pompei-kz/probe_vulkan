@@ -6,8 +6,8 @@
     sudo apt install libgtest-dev
     sudo apt install libglm-dev
     sudo apt install clang-format
-
-
+    
+    sudo apt install libsdl2-dev
     sudo apt install  vulkan-tools
     sudo apt install  libvulkan-dev \
                       vulkan-tools \
