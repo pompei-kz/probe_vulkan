@@ -14,3 +14,4 @@
                       vulkan-validationlayers \
                       glslang-tools
     sudo apt install spirv-tools
+    sudo apt install libshaderc-dev
