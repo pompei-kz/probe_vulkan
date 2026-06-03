@@ -8,6 +8,7 @@ module;
 #include <SDL3/SDL_vulkan.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <shaderc/shaderc.hpp>
 #include <vulkan/vulkan.h>
 
 #include <algorithm>
@@ -80,7 +81,7 @@ namespace
   };
 
   // Данные push constants Vulkan, которые передаются напрямую в vertex shader.
-  // Структура должна совпадать с layout(push_constant) блоком в shaders/triangle.vert.
+  // Структура должна совпадать с layout(push_constant) блоком в files/shaders/triangle.vert.
   struct PushConstants
   {
     glm::mat4 model;
@@ -119,20 +120,36 @@ namespace
     std::vector<VkPresentModeKHR> presentModes;
   };
 
-  std::vector<char> readFile(const std::filesystem::path &path)
+  std::string readTextFile(const std::filesystem::path &path)
   {
-    std::ifstream file(path, std::ios::ate | std::ios::binary);
+    std::ifstream file(path, std::ios::ate);
 
     if (!file.is_open())
     {
       throw std::runtime_error("kQw7nPz4Lm :: failed to open " + path.string());
     }
 
-    const size_t      fileSize = file.tellg();
-    std::vector<char> buffer(fileSize);
+    const size_t fileSize = file.tellg();
+    std::string  buffer(fileSize, '\0');
     file.seekg(0);
-    file.read(buffer.data(), static_cast<std::streamsize>(fileSize));
+    file.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
     return buffer;
+  }
+
+  std::vector<uint32_t> compileShader(const std::filesystem::path &path, const shaderc_shader_kind shaderKind)
+  {
+    const std::string source = readTextFile(path);
+    const std::string pathString = path.string();
+
+    shaderc::Compiler compiler;
+    const shaderc::SpvCompilationResult result = compiler.CompileGlslToSpv(source, shaderKind, pathString.c_str());
+
+    if (result.GetCompilationStatus() != shaderc_compilation_status_success)
+    {
+      throw std::runtime_error("tH7qN4vZpR :: failed to compile shader " + pathString + ": " + result.GetErrorMessage());
+    }
+
+    return {result.cbegin(), result.cend()};
   }
 
 } // namespace
@@ -749,13 +766,13 @@ struct TriangleApplication::Impl
     }
   }
 
-  [[nodiscard]] VkShaderModule createShaderModule(const std::vector<char> &code) const
+  [[nodiscard]] VkShaderModule createShaderModule(const std::vector<uint32_t> &code) const
   {
     // Параметры создания shader module Vulkan.
     VkShaderModuleCreateInfo createInfo{};
     createInfo.sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    createInfo.codeSize = code.size();
-    createInfo.pCode    = reinterpret_cast<const uint32_t *>(code.data());
+    createInfo.codeSize = code.size() * sizeof(uint32_t);
+    createInfo.pCode    = code.data();
 
     // Дескриптор shader module Vulkan.
     VkShaderModule shaderModule = VK_NULL_HANDLE;
@@ -769,9 +786,9 @@ struct TriangleApplication::Impl
 
   void createGraphicsPipeline()
   {
-    const std::filesystem::path basePath       = executableBasePath();
-    const std::vector<char>     vertShaderCode = readFile(basePath / "shaders" / "triangle.vert.spv");
-    const std::vector<char>     fragShaderCode = readFile(basePath / "shaders" / "triangle.frag.spv");
+    const std::filesystem::path shaderPath     = executableBasePath() / "shaders";
+    const std::vector<uint32_t> vertShaderCode = compileShader(shaderPath / "triangle.vert", shaderc_vertex_shader);
+    const std::vector<uint32_t> fragShaderCode = compileShader(shaderPath / "triangle.frag", shaderc_fragment_shader);
 
     // Vertex shader module Vulkan.
     const VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);

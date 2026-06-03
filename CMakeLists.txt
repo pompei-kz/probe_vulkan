@@ -7,29 +7,8 @@ set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 
 find_package(Vulkan REQUIRED)
 find_package(SDL3 REQUIRED)
-
-find_program(GLSLANG_VALIDATOR glslangValidator REQUIRED)
-
-set(SHADER_SOURCES
-  ${CMAKE_CURRENT_SOURCE_DIR}/shaders/triangle.vert
-  ${CMAKE_CURRENT_SOURCE_DIR}/shaders/triangle.frag
-)
-
-set(SHADER_OUTPUTS)
-foreach(SHADER_SOURCE ${SHADER_SOURCES})
-  get_filename_component(SHADER_NAME ${SHADER_SOURCE} NAME)
-  set(SHADER_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/shaders/${SHADER_NAME}.spv)
-  add_custom_command(
-    OUTPUT ${SHADER_OUTPUT}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/shaders
-    COMMAND ${GLSLANG_VALIDATOR} -V ${SHADER_SOURCE} -o ${SHADER_OUTPUT}
-    DEPENDS ${SHADER_SOURCE}
-    VERBATIM
-  )
-  list(APPEND SHADER_OUTPUTS ${SHADER_OUTPUT})
-endforeach()
-
-add_custom_target(compile_shaders DEPENDS ${SHADER_OUTPUTS})
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(SHADERC REQUIRED IMPORTED_TARGET shaderc)
 
 add_executable(probe_vulkan src/main.cpp src/TriangleApplication.cpp)
 target_sources(
@@ -40,7 +19,15 @@ target_sources(
   src/TriangleApplication.cppm
   src/utils.cppm
 )
-add_dependencies(probe_vulkan compile_shaders)
+
+add_custom_command(
+  TARGET probe_vulkan
+  POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_CURRENT_SOURCE_DIR}/files
+    $<TARGET_FILE_DIR:probe_vulkan>
+  VERBATIM
+)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 23)
   target_compile_options(probe_vulkan PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-std=c++2c>)
@@ -51,4 +38,5 @@ target_link_libraries(
   PRIVATE
   Vulkan::Vulkan
   SDL3::SDL3
+  PkgConfig::SHADERC
 )
