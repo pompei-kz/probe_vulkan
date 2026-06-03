@@ -7,6 +7,7 @@ module;
 
 #include <algorithm>
 #include <cstdint>
+#include <filesystem>
 #include <fstream>
 #include <limits>
 #include <optional>
@@ -47,12 +48,12 @@ namespace
     std::vector<VkPresentModeKHR> presentModes;
   };
 
-  std::vector<char> readFile(const std::string &path)
+  std::vector<char> readFile(const std::filesystem::path &path)
   {
     std::ifstream file(path, std::ios::ate | std::ios::binary);
     if (!file.is_open())
     {
-      throw std::runtime_error("kQw7nPz4Lm :: failed to open " + path);
+      throw std::runtime_error("kQw7nPz4Lm :: failed to open " + path.string());
     }
 
     const auto        fileSize = static_cast<size_t>(file.tellg());
@@ -62,16 +63,16 @@ namespace
     return buffer;
   }
 
-  std::string executableBasePath()
+  std::filesystem::path executableBasePath()
   {
     // Получаем путь к каталогу исполняемого файла через SDL.
     const char *basePath = SDL_GetBasePath();
     if (basePath == nullptr)
     {
-      return "";
+      return {};
     }
 
-    return basePath;
+    return std::filesystem::path(basePath);
   }
 
 } // namespace
@@ -661,9 +662,9 @@ struct TriangleApplication::Impl
 
   void createGraphicsPipeline()
   {
-    const std::string basePath       = executableBasePath();
-    const auto        vertShaderCode = readFile(basePath + "shaders/triangle.vert.spv");
-    const auto        fragShaderCode = readFile(basePath + "shaders/triangle.frag.spv");
+    const std::filesystem::path basePath       = executableBasePath();
+    const std::vector<char>     vertShaderCode = readFile(basePath / "shaders" / "triangle.vert.spv");
+    const std::vector<char>     fragShaderCode = readFile(basePath / "shaders" / "triangle.frag.spv");
 
     // Vertex shader module Vulkan.
     const VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
