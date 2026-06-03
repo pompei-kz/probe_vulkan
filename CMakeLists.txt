@@ -31,13 +31,13 @@ endforeach()
 
 add_custom_target(compile_shaders DEPENDS ${SHADER_OUTPUTS})
 
-add_executable(probe_vulkan main.cpp TriangleApplication.cpp)
+add_executable(probe_vulkan src/main.cpp src/TriangleApplication.cpp)
 target_sources(
   probe_vulkan
   PRIVATE
   FILE_SET CXX_MODULES
   FILES
-  TriangleApplication.cppm
+  src/TriangleApplication.cppm
 )
 add_dependencies(probe_vulkan compile_shaders)
 
