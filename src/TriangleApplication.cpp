@@ -1,12 +1,20 @@
 // ReSharper disable CppUseStructuredBinding
 module;
 
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_FORCE_RADIANS
+
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <vulkan/vulkan.h>
 
 #include <algorithm>
+#include <array>
+#include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <limits>
@@ -32,6 +40,56 @@ namespace
   // ReSharper disable once CppVariableCanBeMadeConstexpr
   const std::vector<const char *> kDeviceExtensions = {
       VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+  };
+
+  struct Vertex
+  {
+    glm::vec3 position;
+
+    static VkVertexInputBindingDescription bindingDescription()
+    {
+      // Описание привязки vertex buffer Vulkan.
+      VkVertexInputBindingDescription binding{};
+      binding.binding   = 0;
+      binding.stride    = sizeof(Vertex);
+      binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+      return binding;
+    }
+
+    static std::array<VkVertexInputAttributeDescription, 1> attributeDescriptions()
+    {
+      // Описание атрибута позиции вершины Vulkan.
+      std::array<VkVertexInputAttributeDescription, 1> attributes{};
+      attributes[0].binding  = 0;
+      attributes[0].location = 0;
+      attributes[0].format   = VK_FORMAT_R32G32B32_SFLOAT;
+      attributes[0].offset   = offsetof(Vertex, position);
+      return attributes;
+    }
+  };
+
+  struct TransformMatrices
+  {
+    glm::mat4 model;
+    glm::mat4 view;
+    glm::mat4 projection;
+  };
+
+  struct PushConstants
+  {
+    glm::mat4 mvp;
+  };
+
+  constexpr std::array<Vertex, 3> kTriangleVertices = {
+      Vertex{{0.0F, -0.5F, 0.0F}},
+      Vertex{{0.5F, 0.5F, 0.0F}},
+      Vertex{{-0.5F, 0.5F, 0.0F}},
+  };
+
+  constexpr std::array<uint16_t, 3> kTriangleIndices = {
+      0,
+      1,
+      2,
   };
 
   struct QueueFamilyIndices
@@ -108,6 +166,15 @@ struct TriangleApplication::Impl
   // Графический pipeline Vulkan.
   VkPipeline graphicsPipeline_     = VK_NULL_HANDLE;
 
+  // Vertex buffer Vulkan с позициями треугольника.
+  VkBuffer vertexBuffer_             = VK_NULL_HANDLE;
+  // Память Vulkan для vertex buffer.
+  VkDeviceMemory vertexBufferMemory_ = VK_NULL_HANDLE;
+  // Index buffer Vulkan с индексами треугольника.
+  VkBuffer indexBuffer_              = VK_NULL_HANDLE;
+  // Память Vulkan для index buffer.
+  VkDeviceMemory indexBufferMemory_  = VK_NULL_HANDLE;
+
   // Пул командных буферов Vulkan.
   VkCommandPool commandPool_ = VK_NULL_HANDLE;
   // Командные буферы Vulkan.
@@ -121,6 +188,12 @@ struct TriangleApplication::Impl
   std::vector<VkFence> inFlightFences_;
   uint32_t             currentFrame_       = 0;
   bool                 framebufferResized_ = false;
+  TransformMatrices    transforms_{
+      .model      = glm::mat4(1.0F),
+      .view       = glm::lookAt(glm::vec3(0.0F, 0.0F, 2.0F), glm::vec3(0.0F, 0.0F, 0.0F), glm::vec3(0.0F, 1.0F, 0.0F)),
+      .projection = glm::perspective(glm::radians(45.0F), static_cast<float>(WINDOW_WIDTH) / static_cast<float>(WINDOW_HEIGHT), 0.1F, 10.0F),
+  };
+  PushConstants pushConstants_{};
 
   void run()
   {
@@ -160,6 +233,8 @@ struct TriangleApplication::Impl
     createGraphicsPipeline();
     createFramebuffers();
     createCommandPool();
+    createVertexBuffer();
+    createIndexBuffer();
     createCommandBuffers();
     createSyncObjects();
   }
@@ -203,6 +278,15 @@ struct TriangleApplication::Impl
       // Уничтожаем Vulkan fence кадра.
       vkDestroyFence(device_, inFlightFences_[i], nullptr);
     }
+
+    // Уничтожаем index buffer Vulkan.
+    vkDestroyBuffer(device_, indexBuffer_, nullptr);
+    // Освобождаем память Vulkan для index buffer.
+    vkFreeMemory(device_, indexBufferMemory_, nullptr);
+    // Уничтожаем vertex buffer Vulkan.
+    vkDestroyBuffer(device_, vertexBuffer_, nullptr);
+    // Освобождаем память Vulkan для vertex buffer.
+    vkFreeMemory(device_, vertexBufferMemory_, nullptr);
 
     // Уничтожаем пул команд Vulkan.
     vkDestroyCommandPool(device_, commandPool_, nullptr);
@@ -493,6 +577,17 @@ struct TriangleApplication::Impl
     return actualExtent;
   }
 
+  void updateTransformMatrices()
+  {
+    transforms_.model = glm::mat4(1.0F);
+    transforms_.view  = glm::lookAt(glm::vec3(0.0F, 0.0F, 2.0F), glm::vec3(0.0F, 0.0F, 0.0F), glm::vec3(0.0F, 1.0F, 0.0F));
+
+    const float aspect     = static_cast<float>(swapChainExtent_.width) / static_cast<float>(swapChainExtent_.height);
+    transforms_.projection = glm::perspective(glm::radians(45.0F), aspect, 0.1F, 10.0F);
+    transforms_.projection[1][1] *= -1.0F;
+    pushConstants_.mvp = transforms_.projection * transforms_.view * transforms_.model;
+  }
+
   void createSwapChain()
   {
     const SwapChainSupport swapChainSupport = querySwapChainSupport(physicalDevice_);
@@ -554,6 +649,7 @@ struct TriangleApplication::Impl
 
     swapChainImageFormat_ = surfaceFormat.format;
     swapChainExtent_      = extent;
+    updateTransformMatrices();
   }
 
   void createImageViews()
@@ -681,9 +777,18 @@ struct TriangleApplication::Impl
     // Список shader stages Vulkan.
     const VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
 
+    // Описание binding для vertex buffer Vulkan.
+    const VkVertexInputBindingDescription bindingDescription                     = Vertex::bindingDescription();
+    // Описание attributes для vertex buffer Vulkan.
+    const std::array<VkVertexInputAttributeDescription, 1> attributeDescriptions = Vertex::attributeDescriptions();
+
     // Описание входных вершин Vulkan.
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
-    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertexInputInfo.sType                           = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertexInputInfo.vertexBindingDescriptionCount   = 1;
+    vertexInputInfo.pVertexBindingDescriptions      = &bindingDescription;
+    vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+    vertexInputInfo.pVertexAttributeDescriptions    = attributeDescriptions.data();
 
     // Описание сборки примитивов Vulkan.
     VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
@@ -720,7 +825,7 @@ struct TriangleApplication::Impl
     rasterizer.rasterizerDiscardEnable = VK_FALSE;
     rasterizer.polygonMode             = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth               = 1.0F;
-    rasterizer.cullMode                = VK_CULL_MODE_BACK_BIT;
+    rasterizer.cullMode                = VK_CULL_MODE_NONE;
     rasterizer.frontFace               = VK_FRONT_FACE_CLOCKWISE;
     rasterizer.depthBiasEnable         = VK_FALSE;
 
@@ -743,8 +848,17 @@ struct TriangleApplication::Impl
     colorBlending.pAttachments    = &colorBlendAttachment;
 
     // Layout pipeline Vulkan.
+    // Диапазон push constants Vulkan для матриц трансформации.
+    VkPushConstantRange pushConstantRange{};
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    pushConstantRange.offset     = 0;
+    pushConstantRange.size       = sizeof(PushConstants);
+
+    // Layout pipeline Vulkan.
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfo.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfo.pushConstantRangeCount = 1;
+    pipelineLayoutInfo.pPushConstantRanges    = &pushConstantRange;
 
     // Создаем layout pipeline Vulkan.
     if (vkCreatePipelineLayout(device_, &pipelineLayoutInfo, nullptr, &pipelineLayout_) != VK_SUCCESS)
@@ -823,6 +937,104 @@ struct TriangleApplication::Impl
     }
   }
 
+  [[nodiscard]] uint32_t findMemoryType(const uint32_t typeFilter, const VkMemoryPropertyFlags properties) const
+  {
+    // Свойства памяти физического устройства Vulkan.
+    VkPhysicalDeviceMemoryProperties memoryProperties{};
+    // Получаем свойства памяти физического устройства Vulkan.
+    vkGetPhysicalDeviceMemoryProperties(physicalDevice_, &memoryProperties);
+
+    for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; ++i)
+    {
+      if ((typeFilter & (1 << i)) != 0 && (memoryProperties.memoryTypes[i].propertyFlags & properties) == properties)
+      {
+        return i;
+      }
+    }
+
+    throw std::runtime_error("mR7cQ2vLpN :: failed to find suitable Vulkan memory type");
+  }
+
+  void createBuffer(const VkDeviceSize          size,
+                    const VkBufferUsageFlags    usage,
+                    const VkMemoryPropertyFlags properties,
+                    VkBuffer                   &buffer,
+                    VkDeviceMemory             &bufferMemory) const
+  {
+    // Параметры создания buffer Vulkan.
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size        = size;
+    bufferInfo.usage       = usage;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    // Создаем buffer Vulkan.
+    if (vkCreateBuffer(device_, &bufferInfo, nullptr, &buffer) != VK_SUCCESS)
+    {
+      throw std::runtime_error("zP4hT8nVqS :: failed to create Vulkan buffer");
+    }
+
+    // Требования памяти Vulkan для buffer.
+    VkMemoryRequirements memoryRequirements{};
+    // Получаем требования памяти Vulkan для buffer.
+    vkGetBufferMemoryRequirements(device_, buffer, &memoryRequirements);
+
+    // Параметры выделения памяти Vulkan.
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize  = memoryRequirements.size;
+    allocInfo.memoryTypeIndex = findMemoryType(memoryRequirements.memoryTypeBits, properties);
+
+    // Выделяем память Vulkan для buffer.
+    if (vkAllocateMemory(device_, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS)
+    {
+      throw std::runtime_error("vN9xD3kWsE :: failed to allocate Vulkan buffer memory");
+    }
+
+    // Привязываем память Vulkan к buffer.
+    if (vkBindBufferMemory(device_, buffer, bufferMemory, 0) != VK_SUCCESS)
+    {
+      throw std::runtime_error("qF6sL1xRcM :: failed to bind Vulkan buffer memory");
+    }
+  }
+
+  void uploadBufferData(const VkDeviceMemory bufferMemory, const void *source, const VkDeviceSize size) const
+  {
+    void *data = nullptr;
+    // Отображаем память Vulkan в адресное пространство CPU.
+    if (vkMapMemory(device_, bufferMemory, 0, size, 0, &data) != VK_SUCCESS)
+    {
+      throw std::runtime_error("jK8vM5tHbQ :: failed to map Vulkan buffer memory");
+    }
+    std::memcpy(data, source, static_cast<size_t>(size));
+    // Завершаем отображение памяти Vulkan.
+    vkUnmapMemory(device_, bufferMemory);
+  }
+
+  void createVertexBuffer()
+  {
+    // Размер vertex buffer Vulkan.
+    constexpr VkDeviceSize bufferSize = sizeof(kTriangleVertices[0]) * kTriangleVertices.size();
+    createBuffer(bufferSize,
+                 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 vertexBuffer_,
+                 vertexBufferMemory_);
+    uploadBufferData(vertexBufferMemory_, kTriangleVertices.data(), bufferSize);
+  }
+
+  void createIndexBuffer()
+  {
+    // Размер index buffer Vulkan.
+    constexpr VkDeviceSize bufferSize = sizeof(kTriangleIndices[0]) * kTriangleIndices.size();
+    createBuffer(bufferSize,
+                 VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 indexBuffer_,
+                 indexBufferMemory_);
+    uploadBufferData(indexBufferMemory_, kTriangleIndices.data(), bufferSize);
+  }
+
   void createCommandBuffers()
   {
     commandBuffers_.resize(MAX_FRAMES_IN_FLIGHT);
@@ -870,8 +1082,19 @@ struct TriangleApplication::Impl
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
     // Привязываем графический pipeline Vulkan.
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
-    // Отправляем команду рисования Vulkan.
-    vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+
+    // Vertex buffer Vulkan для привязки к pipeline.
+    const VkBuffer vertexBuffers[]   = {vertexBuffer_};
+    // Смещения vertex buffer Vulkan.
+    constexpr VkDeviceSize offsets[] = {0};
+    // Привязываем vertex buffer Vulkan.
+    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+    // Привязываем index buffer Vulkan.
+    vkCmdBindIndexBuffer(commandBuffer, indexBuffer_, 0, VK_INDEX_TYPE_UINT16);
+    // Передаем матрицы трансформации в push constants Vulkan.
+    vkCmdPushConstants(commandBuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstants), &pushConstants_);
+    // Отправляем индексированную команду рисования Vulkan.
+    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(kTriangleIndices.size()), 1, 0, 0, 0);
     // Завершаем render pass Vulkan.
     vkCmdEndRenderPass(commandBuffer);
 
