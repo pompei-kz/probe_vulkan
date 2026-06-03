@@ -3,6 +3,7 @@ project(probe_vulkan)
 
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 
 find_package(Vulkan REQUIRED)
 find_package(SDL3 REQUIRED)
@@ -30,7 +31,14 @@ endforeach()
 
 add_custom_target(compile_shaders DEPENDS ${SHADER_OUTPUTS})
 
-add_executable(probe_vulkan main.cpp)
+add_executable(probe_vulkan main.cpp TriangleApplication.cpp)
+target_sources(
+  probe_vulkan
+  PRIVATE
+  FILE_SET CXX_MODULES
+  FILES
+  TriangleApplication.cppm
+)
 add_dependencies(probe_vulkan compile_shaders)
 
 target_link_libraries(
