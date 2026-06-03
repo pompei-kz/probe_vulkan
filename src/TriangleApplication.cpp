@@ -34,6 +34,10 @@ namespace
 
   constexpr int WINDOW_WIDTH         = 800;
   constexpr int WINDOW_HEIGHT        = 600;
+
+  // Количество кадров, которые CPU может подготавливать одновременно.
+  // Значение 2 дает двойную буферизацию синхронизации: один кадр отображается или ожидает GPU,
+  // пока следующий уже записывает команды без лишней блокировки CPU.
   constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
   // ReSharper disable once CppTemplateArgumentsCanBeDeduced
@@ -75,11 +79,16 @@ namespace
     glm::mat4 projection;
   };
 
+  // Данные push constants Vulkan, которые передаются напрямую в vertex shader.
+  // Структура должна совпадать с layout(push_constant) блоком в shaders/triangle.vert.
   struct PushConstants
   {
-    glm::mat4 mvp;
+    glm::mat4 model;
+    glm::mat4 view;
+    glm::mat4 projection;
   };
 
+  // ReSharper disable once CppTemplateArgumentsCanBeDeduced
   constexpr std::array<Vertex, 3> kTriangleVertices = {
       Vertex{{0.0F, -0.5F, 0.0F}},
       Vertex{{0.5F, 0.5F, 0.0F}},
@@ -362,7 +371,7 @@ struct TriangleApplication::Impl
     // Получаем список физических устройств Vulkan.
     vkEnumeratePhysicalDevices(instance_, &deviceCount, devices.data());
 
-    for (const auto &device : devices)
+    for (const VkPhysicalDevice &device : devices)
     {
       if (isDeviceSuitable(device))
       {
@@ -562,6 +571,7 @@ struct TriangleApplication::Impl
 
     int width  = 0;
     int height = 0;
+
     // Получаем размер окна SDL в пикселях.
     if (!SDL_GetWindowSizeInPixels(window_, &width, &height))
     {
@@ -585,9 +595,14 @@ struct TriangleApplication::Impl
     const float aspect     = static_cast<float>(swapChainExtent_.width) / static_cast<float>(swapChainExtent_.height);
     transforms_.projection = glm::perspective(glm::radians(45.0F), aspect, 0.1F, 10.0F);
     transforms_.projection[1][1] *= -1.0F;
-    pushConstants_.mvp = transforms_.projection * transforms_.view * transforms_.model;
+    pushConstants_.model      = transforms_.model;
+    pushConstants_.view       = transforms_.view;
+    pushConstants_.projection = transforms_.projection;
   }
 
+  // Swap-chain Vulkan - набор изображений, в которые приложение рисует кадры перед показом в окне.
+  // Здесь выбираются формат, режим показа, размер изображений и режим доступа очередей, после чего
+  // создается объект swap-chain и получаются его изображения для дальнейшего рендеринга.
   void createSwapChain()
   {
     const SwapChainSupport swapChainSupport = querySwapChainSupport(physicalDevice_);
@@ -682,6 +697,9 @@ struct TriangleApplication::Impl
     }
   }
 
+  // Создаем render pass Vulkan - описание того, какие attachment используются при рендеринге,
+  // как они очищаются, сохраняются и в каких layout находятся. Graphics pipeline ссылается на
+  // render pass, чтобы Vulkan заранее знал структуру прохода рендеринга.
   void createRenderPass()
   {
     // Описание цветового attachment Vulkan.
@@ -946,6 +964,7 @@ struct TriangleApplication::Impl
 
     for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; ++i)
     {
+      // ReSharper disable once CppRedundantParentheses
       if ((typeFilter & (1 << i)) != 0 && (memoryProperties.memoryTypes[i].propertyFlags & properties) == properties)
       {
         return i;
@@ -1006,7 +1025,7 @@ struct TriangleApplication::Impl
     {
       throw std::runtime_error("jK8vM5tHbQ :: failed to map Vulkan buffer memory");
     }
-    std::memcpy(data, source, static_cast<size_t>(size));
+    std::memcpy(data, source, size);
     // Завершаем отображение памяти Vulkan.
     vkUnmapMemory(device_, bufferMemory);
   }
@@ -1094,7 +1113,7 @@ struct TriangleApplication::Impl
     // Передаем матрицы трансформации в push constants Vulkan.
     vkCmdPushConstants(commandBuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstants), &pushConstants_);
     // Отправляем индексированную команду рисования Vulkan.
-    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(kTriangleIndices.size()), 1, 0, 0, 0);
+    vkCmdDrawIndexed(commandBuffer, kTriangleIndices.size(), 1, 0, 0, 0);
     // Завершаем render pass Vulkan.
     vkCmdEndRenderPass(commandBuffer);
 
