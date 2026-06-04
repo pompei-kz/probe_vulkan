@@ -29,10 +29,26 @@ export namespace context {
     }
 
   private:
+
+    /*
+     * TODO Using C++23 reflection you need:
+     *  Scan this class for member-fields with type: getter::Getter<TYPE> (let following $name is name of this field)
+     *  For each field $name do:
+     *    Create private member-function without arguments:
+     *      name: create_$name
+     *      return type: TYPE*
+     *    Implement these functions as example following (look comments too)
+     */
+
     bean01::Bean01 *create_bean01()
     {
-      bean01::Bean01 *result = new bean01::Bean01(bean02_);
-      result->initialize();
+      bean01::Bean01 *result = new bean01::Bean01(bean02_);// Use constructor with argument types: getter::Getter<AnyType>
+
+      // If no such constructor, use empty constructor
+      // If no suitable constructor found - compile error
+
+      result->initialize();// call method `initialize` without arguments if it is exists. If no - do not call
+
       return result;
     }
 
@@ -56,5 +72,6 @@ export namespace context {
 
       return result;
     }
+
   };
 } // namespace context
