@@ -14,7 +14,7 @@ int main(const int argc, char **argv)
   try {
     context::Context context;
 
-    const bean01::Bean01 *bean01 = context.get_bean01();
+    const bean01::Bean01 *bean01 = context.get_one();
 
     bean01->hello1();
 

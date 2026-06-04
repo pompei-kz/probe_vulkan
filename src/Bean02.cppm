@@ -4,7 +4,7 @@ module;
 export module bean02;
 
 export namespace bean02 {
-  /// Bean
+  /// Bean two
   class Bean02
   {
     int i = 103;

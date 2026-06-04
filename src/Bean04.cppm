@@ -3,7 +3,7 @@ module;
 export module bean04;
 
 export namespace bean04 {
-  /// Bean
+  /// Bean four
   class Bean04
   {
     int sin = 190;

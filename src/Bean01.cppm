@@ -7,7 +7,7 @@ import bean02;
 import bean03;
 
 export namespace bean01 {
-  ///Bean bean02::Bean02 ; bean03::Bean03
+  ///Bean one ; bean02::Bean02 ; bean03::Bean03
   class Bean01
   {
     getter::Getter<bean02::Bean02> &bean02_;

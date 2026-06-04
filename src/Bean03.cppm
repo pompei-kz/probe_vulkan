@@ -6,7 +6,7 @@ import getter;
 import bean04;
 
 export namespace bean03 {
-  /// Bean bean04::Bean04
+  /// Bean three ; bean04::Bean04
   class Bean03
   {
     float wow;
