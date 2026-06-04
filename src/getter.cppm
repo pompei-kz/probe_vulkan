@@ -66,7 +66,5 @@ export namespace getter {
     {
       return *get();
     }
-
-    void asd() {}
   };
 } // namespace getter

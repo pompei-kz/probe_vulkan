@@ -4,17 +4,22 @@ module;
 export module bean01;
 import getter;
 import bean02;
+import bean03;
 
 export namespace bean01 {
+  ///Bean bean02::Bean02 ; bean03::Bean03
   class Bean01
   {
     getter::Getter<bean02::Bean02> &bean02_;
+    getter::Getter<bean03::Bean03> &bean03_;
 
     int asd;
 
   public:
-    explicit Bean01(getter::Getter<bean02::Bean02> &bean02)
+    // TODO context must call this constructor, because it corresponds to comment above this class
+    explicit Bean01(getter::Getter<bean02::Bean02> &bean02, getter::Getter<bean03::Bean03> &bean03)
         : bean02_(bean02)
+        , bean03_(bean03)
         , asd(0)
     {}
 
@@ -33,6 +38,7 @@ export namespace bean01 {
     {
       std::cout << "zOngRoGKjS :: Hello from Bean01, asd=" << asd << std::endl;
       bean02_->hello();
+      bean03_->hello();
     }
   };
 } // namespace bean01

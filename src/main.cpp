@@ -12,7 +12,7 @@ int main(const int argc, char **argv)
   (void)argv;
 
   try {
-    context::Context context;
+    context::Context1 context;
 
     const bean01::Bean01 *bean01 = context.get_bean01();
 
