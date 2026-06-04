@@ -12,12 +12,7 @@ find_package(SDL3 REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(SHADERC REQUIRED IMPORTED_TARGET shaderc)
 
-set(BEAN_MODULES
-  src/Bean01.cppm
-  src/Bean02.cppm
-  src/Bean03.cppm
-  src/Bean04.cppm
-)
+collect_bean_modules(BEAN_MODULES ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 set(GENERATED_CONTEXT_MODULE ${CMAKE_CURRENT_BINARY_DIR}/generated/Context.cppm)
 generate_context_module(${GENERATED_CONTEXT_MODULE} BEAN_SOURCES ${BEAN_MODULES})
@@ -30,10 +25,17 @@ target_sources(
   FILE_SET CXX_MODULES
   FILES
   ${GENERATED_CONTEXT_MODULE}
-  ${BEAN_MODULES}
   src/getter.cppm
   src/TriangleApplication.cppm
   src/utils.cppm
+)
+
+target_sources(
+  probe_vulkan
+  PRIVATE
+  FILE_SET CXX_MODULES
+  FILES
+  ${BEAN_MODULES}
 )
 
 file(GLOB_RECURSE RUNTIME_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/files/*)

@@ -1,3 +1,20 @@
+function(collect_bean_modules output_var source_dir)
+  file(GLOB candidate_modules CONFIGURE_DEPENDS "${source_dir}/*.cppm")
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${candidate_modules})
+
+  set(bean_modules "")
+
+  foreach(candidate_module IN LISTS candidate_modules)
+    file(READ "${candidate_module}" content)
+
+    if(content MATCHES "///[ \t]*Bean")
+      list(APPEND bean_modules "${candidate_module}")
+    endif()
+  endforeach()
+
+  set(${output_var} ${bean_modules} PARENT_SCOPE)
+endfunction()
+
 function(generate_context_module output_file)
   set(options)
   set(one_value_args)
@@ -33,7 +50,7 @@ function(generate_context_module output_file)
     set(namespace_name "${CMAKE_MATCH_1}")
 
     if(NOT content MATCHES "class[ \t\r\n]+([A-Za-z_][A-Za-z0-9_]*)")
-      message(FATAL_ERROR "Cannot find bean class in ${bean_source}")
+      message(FATAL_ERROR "PO8I7xeYBv :: Cannot find bean class in ${bean_source}") # TODO every error prefix with random ID length 10 and ::
     endif()
     set(class_name "${CMAKE_MATCH_1}")
 
