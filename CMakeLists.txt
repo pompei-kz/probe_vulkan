@@ -26,7 +26,6 @@ target_sources(
   FILES
   ${GENERATED_CONTEXT_MODULE}
   src/getter.cppm
-  src/TriangleApplication.cppm
   src/utils.cppm
 )
 

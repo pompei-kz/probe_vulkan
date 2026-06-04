@@ -154,6 +154,8 @@ namespace {
 
 } // namespace
 
+namespace app {
+
 struct TriangleApplication::Impl
 {
   SDL_Window *window_ = nullptr;
@@ -1254,3 +1256,5 @@ void TriangleApplication::run()
 {
   impl_->run();
 }
+
+} // namespace app
