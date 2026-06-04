@@ -22,7 +22,7 @@ function(generate_context_module output_file)
   cmake_parse_arguments(ARG "${options}" "${one_value_args}" "${multi_value_args}" ${ARGN})
 
   if(NOT ARG_BEAN_SOURCES)
-    message(FATAL_ERROR "generate_context_module requires BEAN_SOURCES")
+    message(FATAL_ERROR "kHg4Pq1sVa :: generate_context_module requires BEAN_SOURCES")
   endif()
 
   set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${ARG_BEAN_SOURCES})
@@ -40,17 +40,17 @@ function(generate_context_module output_file)
     endif()
 
     if(NOT content MATCHES "export[ \t\r\n]+module[ \t\r\n]+([A-Za-z_][A-Za-z0-9_]*)")
-      message(FATAL_ERROR "Cannot find exported module name in ${bean_source}")
+      message(FATAL_ERROR "Aa7Qm3tRz9 :: Cannot find exported module name in ${bean_source}")
     endif()
     set(module_name "${CMAKE_MATCH_1}")
 
     if(NOT content MATCHES "export[ \t\r\n]+namespace[ \t\r\n]+([A-Za-z_][A-Za-z0-9_]*)")
-      message(FATAL_ERROR "Cannot find exported namespace in ${bean_source}")
+      message(FATAL_ERROR "Vn2xLp8Kc4 :: Cannot find exported namespace in ${bean_source}")
     endif()
     set(namespace_name "${CMAKE_MATCH_1}")
 
     if(NOT content MATCHES "class[ \t\r\n]+([A-Za-z_][A-Za-z0-9_]*)")
-      message(FATAL_ERROR "PO8I7xeYBv :: Cannot find bean class in ${bean_source}") # TODO every error prefix with random ID length 10 and ::
+      message(FATAL_ERROR "PO8I7xeYBv :: Cannot find bean class in ${bean_source}")
     endif()
     set(class_name "${CMAKE_MATCH_1}")
 
@@ -71,7 +71,7 @@ function(generate_context_module output_file)
     set(constructor_args "")
     foreach(dependency IN LISTS dependencies)
       if(NOT dependency MATCHES "^([A-Za-z_][A-Za-z0-9_]*)::")
-        message(FATAL_ERROR "Cannot parse dependency '${dependency}' in ${bean_source}")
+        message(FATAL_ERROR "Zr5mUd0YpN :: Cannot parse dependency '${dependency}' in ${bean_source}")
       endif()
 
       if(constructor_args)
