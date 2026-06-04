@@ -5,10 +5,23 @@ set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 
+include(cmake/GenerateContext.cmake)
+
 find_package(Vulkan REQUIRED)
 find_package(SDL3 REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(SHADERC REQUIRED IMPORTED_TARGET shaderc)
+
+set(BEAN_MODULES
+  src/Bean01.cppm
+  src/Bean02.cppm
+  src/Bean03.cppm
+  src/Bean04.cppm
+)
+
+set(GENERATED_CONTEXT_MODULE ${CMAKE_CURRENT_BINARY_DIR}/generated/Context.cppm)
+generate_context_module(${GENERATED_CONTEXT_MODULE} BEAN_SOURCES ${BEAN_MODULES})
+set_source_files_properties(${GENERATED_CONTEXT_MODULE} PROPERTIES GENERATED TRUE)
 
 add_executable(probe_vulkan src/main.cpp src/TriangleApplication.cpp)
 target_sources(
@@ -16,11 +29,8 @@ target_sources(
   PRIVATE
   FILE_SET CXX_MODULES
   FILES
-  src/Context1.cppm
-  src/Bean01.cppm
-  src/Bean02.cppm
-  src/Bean03.cppm
-  src/Bean04.cppm
+  ${GENERATED_CONTEXT_MODULE}
+  ${BEAN_MODULES}
   src/getter.cppm
   src/TriangleApplication.cppm
   src/utils.cppm

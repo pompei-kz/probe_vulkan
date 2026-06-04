@@ -16,7 +16,6 @@ export namespace bean01 {
     int asd;
 
   public:
-    // TODO context must call this constructor, because it corresponds to comment above this class
     explicit Bean01(getter::Getter<bean02::Bean02> &bean02, getter::Getter<bean03::Bean03> &bean03)
         : bean02_(bean02)
         , bean03_(bean03)
