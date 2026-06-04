@@ -30,11 +30,10 @@ module triangle_application;
 
 import utils;
 
-namespace
-{
+namespace {
 
-  constexpr int WINDOW_WIDTH         = 800;
-  constexpr int WINDOW_HEIGHT        = 600;
+  constexpr int WINDOW_WIDTH  = 800;
+  constexpr int WINDOW_HEIGHT = 600;
 
   // Количество кадров, которые CPU может подготавливать одновременно.
   // Значение 2 дает двойную буферизацию синхронизации: один кадр отображается или ожидает GPU,
@@ -107,7 +106,10 @@ namespace
     std::optional<uint32_t> graphicsFamily;
     std::optional<uint32_t> presentFamily;
 
-    [[nodiscard]] bool complete() const { return graphicsFamily.has_value() && presentFamily.has_value(); }
+    [[nodiscard]] bool complete() const
+    {
+      return graphicsFamily.has_value() && presentFamily.has_value();
+    }
   };
 
   struct SwapChainSupport
@@ -124,8 +126,7 @@ namespace
   {
     std::ifstream file(path, std::ios::ate);
 
-    if (!file.is_open())
-    {
+    if (!file.is_open()) {
       throw std::runtime_error("kQw7nPz4Lm :: failed to open " + path.string());
     }
 
@@ -138,14 +139,13 @@ namespace
 
   std::vector<uint32_t> compileShader(const std::filesystem::path &path, const shaderc_shader_kind shaderKind)
   {
-    const std::string source = readTextFile(path);
+    const std::string source     = readTextFile(path);
     const std::string pathString = path.string();
 
-    shaderc::Compiler compiler;
+    shaderc::Compiler                   compiler;
     const shaderc::SpvCompilationResult result = compiler.CompileGlslToSpv(source, shaderKind, pathString.c_str());
 
-    if (result.GetCompilationStatus() != shaderc_compilation_status_success)
-    {
+    if (result.GetCompilationStatus() != shaderc_compilation_status_success) {
       throw std::runtime_error("tH7qN4vZpR :: failed to compile shader " + pathString + ": " + result.GetErrorMessage());
     }
 
@@ -215,9 +215,9 @@ struct TriangleApplication::Impl
   uint32_t             currentFrame_       = 0;
   bool                 framebufferResized_ = false;
   TransformMatrices    transforms_{
-      .model      = glm::mat4(1.0F),
-      .view       = glm::lookAt(glm::vec3(0.0F, 0.0F, 2.0F), glm::vec3(0.0F, 0.0F, 0.0F), glm::vec3(0.0F, 1.0F, 0.0F)),
-      .projection = glm::perspective(glm::radians(45.0F), static_cast<float>(WINDOW_WIDTH) / static_cast<float>(WINDOW_HEIGHT), 0.1F, 10.0F),
+         .model      = glm::mat4(1.0F),
+         .view       = glm::lookAt(glm::vec3(0.0F, 0.0F, 2.0F), glm::vec3(0.0F, 0.0F, 0.0F), glm::vec3(0.0F, 1.0F, 0.0F)),
+         .projection = glm::perspective(glm::radians(45.0F), static_cast<float>(WINDOW_WIDTH) / static_cast<float>(WINDOW_HEIGHT), 0.1F, 10.0F),
   };
   PushConstants pushConstants_{};
 
@@ -232,16 +232,14 @@ struct TriangleApplication::Impl
   void initWindow()
   {
     // Инициализируем видео-подсистему SDL.
-    if (!SDL_Init(SDL_INIT_VIDEO))
-    {
+    if (!SDL_Init(SDL_INIT_VIDEO)) {
       // Получаем текст ошибки SDL.
       throw std::runtime_error(std::string("pR8mX2vNaQ :: ") + SDL_GetError());
     }
 
     // Создаем окно SDL, совместимое с Vulkan.
     window_ = SDL_CreateWindow("Vulkan Triangle", WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
-    if (window_ == nullptr)
-    {
+    if (window_ == nullptr) {
       // Получаем текст ошибки SDL.
       throw std::runtime_error(std::string("aT5sJ9qBvE :: ") + SDL_GetError());
     }
@@ -268,18 +266,13 @@ struct TriangleApplication::Impl
   void mainLoop()
   {
     bool quit = false;
-    while (!quit)
-    {
+    while (!quit) {
       SDL_Event event{};
       // Забираем следующее событие из очереди SDL.
-      while (SDL_PollEvent(&event) != 0)
-      {
-        if (event.type == SDL_EVENT_QUIT)
-        {
+      while (SDL_PollEvent(&event) != 0) {
+        if (event.type == SDL_EVENT_QUIT) {
           quit = true;
-        }
-        else if (event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED)
-        {
+        } else if (event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) {
           framebufferResized_ = true;
         }
       }
@@ -295,8 +288,7 @@ struct TriangleApplication::Impl
   {
     cleanupSwapChain();
 
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
-    {
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
       // Уничтожаем Vulkan semaphore ожидания завершения рендера.
       vkDestroySemaphore(device_, renderFinishedSemaphores_[i], nullptr);
       // Уничтожаем Vulkan semaphore доступности изображения.
@@ -343,8 +335,7 @@ struct TriangleApplication::Impl
     Uint32 extensionCount         = 0;
     // Получаем список расширений Vulkan, которые нужны SDL.
     const char *const *extensions = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
-    if (extensions == nullptr)
-    {
+    if (extensions == nullptr) {
       // Получаем текст ошибки SDL.
       throw std::runtime_error(std::string("hM4cV7nLxS :: ") + SDL_GetError());
     }
@@ -357,8 +348,7 @@ struct TriangleApplication::Impl
     createInfo.ppEnabledExtensionNames = extensions;
 
     // Создаем экземпляр Vulkan.
-    if (vkCreateInstance(&createInfo, nullptr, &instance_) != VK_SUCCESS)
-    {
+    if (vkCreateInstance(&createInfo, nullptr, &instance_) != VK_SUCCESS) {
       throw std::runtime_error("uF2dK8wYpC :: failed to create Vulkan instance");
     }
   }
@@ -366,8 +356,7 @@ struct TriangleApplication::Impl
   void createSurface()
   {
     // Создаем Vulkan surface для окна SDL.
-    if (!SDL_Vulkan_CreateSurface(window_, instance_, nullptr, &surface_))
-    {
+    if (!SDL_Vulkan_CreateSurface(window_, instance_, nullptr, &surface_)) {
       // Получаем текст ошибки SDL.
       throw std::runtime_error(std::string("zN6rQ1tGmH :: ERROR IN `SDL_Vulkan_CreateSurface()`: ") + SDL_GetError());
     }
@@ -378,8 +367,7 @@ struct TriangleApplication::Impl
     uint32_t deviceCount = 0;
     // Запрашиваем количество физических устройств Vulkan.
     vkEnumeratePhysicalDevices(instance_, &deviceCount, nullptr);
-    if (deviceCount == 0)
-    {
+    if (deviceCount == 0) {
       throw std::runtime_error("bL3xS9eRwD :: failed to find GPUs with Vulkan support");
     }
 
@@ -388,17 +376,14 @@ struct TriangleApplication::Impl
     // Получаем список физических устройств Vulkan.
     vkEnumeratePhysicalDevices(instance_, &deviceCount, devices.data());
 
-    for (const VkPhysicalDevice &device : devices)
-    {
-      if (isDeviceSuitable(device))
-      {
+    for (const VkPhysicalDevice &device : devices) {
+      if (isDeviceSuitable(device)) {
         physicalDevice_ = device;
         break;
       }
     }
 
-    if (physicalDevice_ == VK_NULL_HANDLE)
-    {
+    if (physicalDevice_ == VK_NULL_HANDLE) {
       throw std::runtime_error("ZGNjrNDGyX :: failed to find a suitable GPU");
     }
   }
@@ -409,8 +394,7 @@ struct TriangleApplication::Impl
     const bool               extensionsSupported = checkDeviceExtensionSupport(device);
     bool                     swapChainAdequate   = false;
 
-    if (extensionsSupported)
-    {
+    if (extensionsSupported) {
       const SwapChainSupport swapChainSupport = querySwapChainSupport(device);
       swapChainAdequate                       = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
     }
@@ -431,8 +415,7 @@ struct TriangleApplication::Impl
 
     std::set<std::string> requiredExtensions(kDeviceExtensions.begin(), kDeviceExtensions.end());
     // ReSharper disable once CppUseStructuredBinding
-    for (const VkExtensionProperties &extension : availableExtensions)
-    {
+    for (const VkExtensionProperties &extension : availableExtensions) {
       requiredExtensions.erase(extension.extensionName);
     }
 
@@ -452,10 +435,8 @@ struct TriangleApplication::Impl
     // Получаем свойства семейств очередей Vulkan.
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 
-    for (uint32_t i = 0; i < queueFamilies.size(); ++i)
-    {
-      if ((queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0)
-      {
+    for (uint32_t i = 0; i < queueFamilies.size(); ++i) {
+      if ((queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0) {
         indices.graphicsFamily = i;
       }
 
@@ -463,13 +444,11 @@ struct TriangleApplication::Impl
       VkBool32 presentSupport = VK_FALSE;
       // Проверяем поддержку показа Vulkan для семейства очередей.
       vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface_, &presentSupport);
-      if (presentSupport == VK_TRUE)
-      {
+      if (presentSupport == VK_TRUE) {
         indices.presentFamily = i;
       }
 
-      if (indices.complete())
-      {
+      if (indices.complete()) {
         break;
       }
     }
@@ -489,8 +468,7 @@ struct TriangleApplication::Impl
     std::set<uint32_t> uniqueQueueFamilies = {*indices.graphicsFamily, *indices.presentFamily};
 
     constexpr float queuePriority = 1.0F;
-    for (uint32_t queueFamily : uniqueQueueFamilies)
-    {
+    for (uint32_t queueFamily : uniqueQueueFamilies) {
       // Описание очереди Vulkan для логического устройства.
       VkDeviceQueueCreateInfo queueCreateInfo{};
       queueCreateInfo.sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
@@ -513,8 +491,7 @@ struct TriangleApplication::Impl
     createInfo.ppEnabledExtensionNames = kDeviceExtensions.data();
 
     // Создаем логическое устройство Vulkan.
-    if (vkCreateDevice(physicalDevice_, &createInfo, nullptr, &device_) != VK_SUCCESS)
-    {
+    if (vkCreateDevice(physicalDevice_, &createInfo, nullptr, &device_) != VK_SUCCESS) {
       throw std::runtime_error("cY7pD4nVaR :: failed to create logical device");
     }
 
@@ -533,8 +510,7 @@ struct TriangleApplication::Impl
     uint32_t formatCount = 0;
     // Запрашиваем количество форматов Vulkan surface.
     vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface_, &formatCount, nullptr);
-    if (formatCount != 0)
-    {
+    if (formatCount != 0) {
       details.formats.resize(formatCount);
       // Получаем доступные форматы Vulkan surface.
       vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface_, &formatCount, details.formats.data());
@@ -543,8 +519,7 @@ struct TriangleApplication::Impl
     uint32_t presentModeCount = 0;
     // Запрашиваем количество режимов показа Vulkan surface.
     vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface_, &presentModeCount, nullptr);
-    if (presentModeCount != 0)
-    {
+    if (presentModeCount != 0) {
       details.presentModes.resize(presentModeCount);
       // Получаем доступные режимы показа Vulkan surface.
       vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface_, &presentModeCount, details.presentModes.data());
@@ -555,10 +530,8 @@ struct TriangleApplication::Impl
 
   static VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &formats)
   {
-    for (const auto &availableFormat : formats)
-    {
-      if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
-      {
+    for (const auto &availableFormat : formats) {
+      if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
         return availableFormat;
       }
     }
@@ -568,10 +541,8 @@ struct TriangleApplication::Impl
 
   static VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR> &presentModes)
   {
-    for (const auto &availablePresentMode : presentModes)
-    {
-      if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR)
-      {
+    for (const auto &availablePresentMode : presentModes) {
+      if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
         return availablePresentMode;
       }
     }
@@ -581,8 +552,7 @@ struct TriangleApplication::Impl
 
   [[nodiscard]] VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities) const
   {
-    if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
-    {
+    if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
       return capabilities.currentExtent;
     }
 
@@ -590,8 +560,7 @@ struct TriangleApplication::Impl
     int height = 0;
 
     // Получаем размер окна SDL в пикселях.
-    if (!SDL_GetWindowSizeInPixels(window_, &width, &height))
-    {
+    if (!SDL_GetWindowSizeInPixels(window_, &width, &height)) {
       // Получаем текст ошибки SDL.
       throw std::runtime_error(std::string("mE9tH2wKsL :: ") + SDL_GetError());
     }
@@ -631,8 +600,7 @@ struct TriangleApplication::Impl
     const VkExtent2D extent                 = chooseSwapExtent(swapChainSupport.capabilities);
     uint32_t         imageCount             = swapChainSupport.capabilities.minImageCount + 1;
 
-    if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount)
-    {
+    if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount) {
       imageCount = swapChainSupport.capabilities.maxImageCount;
     }
 
@@ -650,14 +618,11 @@ struct TriangleApplication::Impl
     const QueueFamilyIndices indices              = findQueueFamilies(physicalDevice_);
     const uint32_t           queueFamilyIndices[] = {*indices.graphicsFamily, *indices.presentFamily};
 
-    if (indices.graphicsFamily != indices.presentFamily)
-    {
+    if (indices.graphicsFamily != indices.presentFamily) {
       createInfo.imageSharingMode      = VK_SHARING_MODE_CONCURRENT;
       createInfo.queueFamilyIndexCount = 2;
       createInfo.pQueueFamilyIndices   = queueFamilyIndices;
-    }
-    else
-    {
+    } else {
       createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     }
 
@@ -668,8 +633,7 @@ struct TriangleApplication::Impl
     createInfo.oldSwapchain   = VK_NULL_HANDLE;
 
     // Создаем swap-chain Vulkan.
-    if (vkCreateSwapchainKHR(device_, &createInfo, nullptr, &swapChain_) != VK_SUCCESS)
-    {
+    if (vkCreateSwapchainKHR(device_, &createInfo, nullptr, &swapChain_) != VK_SUCCESS) {
       throw std::runtime_error("xV5qN8cTpJ :: failed to create swap chain");
     }
 
@@ -688,8 +652,7 @@ struct TriangleApplication::Impl
   {
     swapChainImageViews_.resize(swapChainImages_.size());
 
-    for (size_t i = 0; i < swapChainImages_.size(); ++i)
-    {
+    for (size_t i = 0; i < swapChainImages_.size(); ++i) {
       // Параметры создания image view Vulkan.
       VkImageViewCreateInfo createInfo{};
       createInfo.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -707,8 +670,7 @@ struct TriangleApplication::Impl
       createInfo.subresourceRange.layerCount     = 1;
 
       // Создаем image view Vulkan для изображения swap-chain.
-      if (vkCreateImageView(device_, &createInfo, nullptr, &swapChainImageViews_[i]) != VK_SUCCESS)
-      {
+      if (vkCreateImageView(device_, &createInfo, nullptr, &swapChainImageViews_[i]) != VK_SUCCESS) {
         throw std::runtime_error("rB1mF6zQeW :: failed to create image views");
       }
     }
@@ -760,8 +722,7 @@ struct TriangleApplication::Impl
     renderPassInfo.pDependencies   = &dependency;
 
     // Создаем render pass Vulkan.
-    if (vkCreateRenderPass(device_, &renderPassInfo, nullptr, &renderPass_) != VK_SUCCESS)
-    {
+    if (vkCreateRenderPass(device_, &renderPassInfo, nullptr, &renderPass_) != VK_SUCCESS) {
       throw std::runtime_error("nK8sP3yLdM :: failed to create render pass");
     }
   }
@@ -777,8 +738,7 @@ struct TriangleApplication::Impl
     // Дескриптор shader module Vulkan.
     VkShaderModule shaderModule = VK_NULL_HANDLE;
     // Создаем shader module Vulkan.
-    if (vkCreateShaderModule(device_, &createInfo, nullptr, &shaderModule) != VK_SUCCESS)
-    {
+    if (vkCreateShaderModule(device_, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
       throw std::runtime_error("gW4vC9hTxN :: failed to create shader module");
     }
     return shaderModule;
@@ -896,8 +856,7 @@ struct TriangleApplication::Impl
     pipelineLayoutInfo.pPushConstantRanges    = &pushConstantRange;
 
     // Создаем layout pipeline Vulkan.
-    if (vkCreatePipelineLayout(device_, &pipelineLayoutInfo, nullptr, &pipelineLayout_) != VK_SUCCESS)
-    {
+    if (vkCreatePipelineLayout(device_, &pipelineLayoutInfo, nullptr, &pipelineLayout_) != VK_SUCCESS) {
       throw std::runtime_error("dP6kR2mZaS :: failed to create pipeline layout");
     }
 
@@ -917,8 +876,7 @@ struct TriangleApplication::Impl
     pipelineInfo.subpass             = 0;
 
     // Создаем графический pipeline Vulkan.
-    if (vkCreateGraphicsPipelines(device_, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline_) != VK_SUCCESS)
-    {
+    if (vkCreateGraphicsPipelines(device_, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline_) != VK_SUCCESS) {
       throw std::runtime_error("yL9fV5qBnE :: failed to create graphics pipeline");
     }
 
@@ -932,8 +890,7 @@ struct TriangleApplication::Impl
   {
     swapChainFramebuffers_.resize(swapChainImageViews_.size());
 
-    for (size_t i = 0; i < swapChainImageViews_.size(); ++i)
-    {
+    for (size_t i = 0; i < swapChainImageViews_.size(); ++i) {
       // Attachment framebuffer Vulkan.
       const VkImageView attachments[] = {swapChainImageViews_[i]};
 
@@ -948,8 +905,7 @@ struct TriangleApplication::Impl
       framebufferInfo.layers          = 1;
 
       // Создаем framebuffer Vulkan.
-      if (vkCreateFramebuffer(device_, &framebufferInfo, nullptr, &swapChainFramebuffers_[i]) != VK_SUCCESS)
-      {
+      if (vkCreateFramebuffer(device_, &framebufferInfo, nullptr, &swapChainFramebuffers_[i]) != VK_SUCCESS) {
         throw std::runtime_error("tH3wX8cJpQ :: failed to create framebuffer");
       }
     }
@@ -966,8 +922,7 @@ struct TriangleApplication::Impl
     poolInfo.queueFamilyIndex = *queueFamilyIndices.graphicsFamily;
 
     // Создаем command pool Vulkan.
-    if (vkCreateCommandPool(device_, &poolInfo, nullptr, &commandPool_) != VK_SUCCESS)
-    {
+    if (vkCreateCommandPool(device_, &poolInfo, nullptr, &commandPool_) != VK_SUCCESS) {
       throw std::runtime_error("sM7nD1vKgR :: failed to create command pool");
     }
   }
@@ -979,11 +934,9 @@ struct TriangleApplication::Impl
     // Получаем свойства памяти физического устройства Vulkan.
     vkGetPhysicalDeviceMemoryProperties(physicalDevice_, &memoryProperties);
 
-    for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; ++i)
-    {
+    for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; ++i) {
       // ReSharper disable once CppRedundantParentheses
-      if ((typeFilter & (1 << i)) != 0 && (memoryProperties.memoryTypes[i].propertyFlags & properties) == properties)
-      {
+      if ((typeFilter & (1 << i)) != 0 && (memoryProperties.memoryTypes[i].propertyFlags & properties) == properties) {
         return i;
       }
     }
@@ -1005,8 +958,7 @@ struct TriangleApplication::Impl
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
     // Создаем buffer Vulkan.
-    if (vkCreateBuffer(device_, &bufferInfo, nullptr, &buffer) != VK_SUCCESS)
-    {
+    if (vkCreateBuffer(device_, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
       throw std::runtime_error("zP4hT8nVqS :: failed to create Vulkan buffer");
     }
 
@@ -1022,14 +974,12 @@ struct TriangleApplication::Impl
     allocInfo.memoryTypeIndex = findMemoryType(memoryRequirements.memoryTypeBits, properties);
 
     // Выделяем память Vulkan для buffer.
-    if (vkAllocateMemory(device_, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS)
-    {
+    if (vkAllocateMemory(device_, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
       throw std::runtime_error("vN9xD3kWsE :: failed to allocate Vulkan buffer memory");
     }
 
     // Привязываем память Vulkan к buffer.
-    if (vkBindBufferMemory(device_, buffer, bufferMemory, 0) != VK_SUCCESS)
-    {
+    if (vkBindBufferMemory(device_, buffer, bufferMemory, 0) != VK_SUCCESS) {
       throw std::runtime_error("qF6sL1xRcM :: failed to bind Vulkan buffer memory");
     }
   }
@@ -1038,8 +988,7 @@ struct TriangleApplication::Impl
   {
     void *data = nullptr;
     // Отображаем память Vulkan в адресное пространство CPU.
-    if (vkMapMemory(device_, bufferMemory, 0, size, 0, &data) != VK_SUCCESS)
-    {
+    if (vkMapMemory(device_, bufferMemory, 0, size, 0, &data) != VK_SUCCESS) {
       throw std::runtime_error("jK8vM5tHbQ :: failed to map Vulkan buffer memory");
     }
     std::memcpy(data, source, size);
@@ -1083,8 +1032,7 @@ struct TriangleApplication::Impl
     allocInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers_.size());
 
     // Выделяем command buffers Vulkan.
-    if (vkAllocateCommandBuffers(device_, &allocInfo, commandBuffers_.data()) != VK_SUCCESS)
-    {
+    if (vkAllocateCommandBuffers(device_, &allocInfo, commandBuffers_.data()) != VK_SUCCESS) {
       throw std::runtime_error("vC2pL9yWtF :: failed to allocate command buffers");
     }
   }
@@ -1096,8 +1044,7 @@ struct TriangleApplication::Impl
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
     // Начинаем запись command buffer Vulkan.
-    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS)
-    {
+    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
       throw std::runtime_error("qN5eZ8rHsB :: failed to begin recording command buffer");
     }
 
@@ -1135,8 +1082,7 @@ struct TriangleApplication::Impl
     vkCmdEndRenderPass(commandBuffer);
 
     // Завершаем запись command buffer Vulkan.
-    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
-    {
+    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
       throw std::runtime_error("wJ4tK6mPxV :: failed to record command buffer");
     }
   }
@@ -1156,23 +1102,19 @@ struct TriangleApplication::Impl
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
-    {
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
       // Создаем semaphore Vulkan для ожидания изображения.
-      if (vkCreateSemaphore(device_, &semaphoreInfo, nullptr, &imageAvailableSemaphores_[i]) != VK_SUCCESS)
-      {
+      if (vkCreateSemaphore(device_, &semaphoreInfo, nullptr, &imageAvailableSemaphores_[i]) != VK_SUCCESS) {
         throw std::runtime_error("eR8sB2qNyT :: failed to create image-available semaphore");
       }
 
       // Создаем semaphore Vulkan для ожидания завершения рендера.
-      if (vkCreateSemaphore(device_, &semaphoreInfo, nullptr, &renderFinishedSemaphores_[i]) != VK_SUCCESS)
-      {
+      if (vkCreateSemaphore(device_, &semaphoreInfo, nullptr, &renderFinishedSemaphores_[i]) != VK_SUCCESS) {
         throw std::runtime_error("lD5vH9cWmK :: failed to create render-finished semaphore");
       }
 
       // Создаем fence Vulkan для кадра.
-      if (vkCreateFence(device_, &fenceInfo, nullptr, &inFlightFences_[i]) != VK_SUCCESS)
-      {
+      if (vkCreateFence(device_, &fenceInfo, nullptr, &inFlightFences_[i]) != VK_SUCCESS) {
         throw std::runtime_error("pX1kT7zQaF :: failed to create in-flight fence");
       }
     }
@@ -1187,13 +1129,11 @@ struct TriangleApplication::Impl
     // Получаем следующее изображение swap-chain Vulkan.
     VkResult result = vkAcquireNextImageKHR(device_, swapChain_, UINT64_MAX, imageAvailableSemaphores_[currentFrame_], VK_NULL_HANDLE, &imageIndex);
 
-    if (result == VK_ERROR_OUT_OF_DATE_KHR)
-    {
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
       recreateSwapChain();
       return;
     }
-    if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
-    {
+    if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
       throw std::runtime_error("cM6yV3nLdP :: failed to acquire swap chain image");
     }
 
@@ -1222,8 +1162,7 @@ struct TriangleApplication::Impl
     submitInfo.pSignalSemaphores    = signalSemaphores;
 
     // Отправляем command buffer Vulkan в графическую очередь.
-    if (vkQueueSubmit(graphicsQueue_, 1, &submitInfo, inFlightFences_[currentFrame_]) != VK_SUCCESS)
-    {
+    if (vkQueueSubmit(graphicsQueue_, 1, &submitInfo, inFlightFences_[currentFrame_]) != VK_SUCCESS) {
       throw std::runtime_error("aW9qE4sVrN :: failed to submit draw command buffer");
     }
 
@@ -1238,13 +1177,10 @@ struct TriangleApplication::Impl
 
     // Показываем изображение swap-chain Vulkan.
     result = vkQueuePresentKHR(presentQueue_, &presentInfo);
-    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized_)
-    {
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized_) {
       framebufferResized_ = false;
       recreateSwapChain();
-    }
-    else if (result != VK_SUCCESS)
-    {
+    } else if (result != VK_SUCCESS) {
       throw std::runtime_error("hT2pK8mJxC :: failed to present swap chain image");
     }
 
@@ -1257,8 +1193,7 @@ struct TriangleApplication::Impl
     int height = 0;
     // Получаем размер окна SDL в пикселях.
     SDL_GetWindowSizeInPixels(window_, &width, &height);
-    while (width == 0 || height == 0)
-    {
+    while (width == 0 || height == 0) {
       // Ждем событие SDL, пока окно свернуто или имеет нулевой размер.
       SDL_WaitEvent(nullptr);
       // Повторно получаем размер окна SDL в пикселях.
@@ -1278,8 +1213,7 @@ struct TriangleApplication::Impl
 
   void cleanupSwapChain()
   {
-    for (const VkFramebuffer framebuffer : swapChainFramebuffers_)
-    {
+    for (const VkFramebuffer framebuffer : swapChainFramebuffers_) {
       // Уничтожаем framebuffer Vulkan.
       vkDestroyFramebuffer(device_, framebuffer, nullptr);
     }
@@ -1297,8 +1231,7 @@ struct TriangleApplication::Impl
     vkDestroyRenderPass(device_, renderPass_, nullptr);
     renderPass_ = VK_NULL_HANDLE;
 
-    for (const VkImageView imageView : swapChainImageViews_)
-    {
+    for (const VkImageView imageView : swapChainImageViews_) {
       // Уничтожаем image view Vulkan.
       vkDestroyImageView(device_, imageView, nullptr);
     }
@@ -1312,8 +1245,7 @@ struct TriangleApplication::Impl
 
 TriangleApplication::TriangleApplication()
     : impl_(std::make_unique<Impl>())
-{
-}
+{}
 
 TriangleApplication::~TriangleApplication() = default;
 

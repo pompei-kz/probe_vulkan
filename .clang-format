@@ -6,7 +6,13 @@ UseTab: Never
 
 ColumnLimit: 150
 
-BreakBeforeBraces: Allman
+BreakBeforeBraces: Custom
+
+BraceWrapping:
+  AfterClass: true
+  AfterStruct: true
+  AfterFunction: true
+  SplitEmptyFunction: false
 
 PointerAlignment: Right
 NamespaceIndentation: All
@@ -14,7 +20,7 @@ NamespaceIndentation: All
 BreakConstructorInitializers: BeforeComma
 
 AllowShortIfStatementsOnASingleLine: true
-AllowShortFunctionsOnASingleLine: Inline
+AllowShortFunctionsOnASingleLine: Empty
 
 Standard: Latest
 

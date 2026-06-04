@@ -8,9 +8,10 @@ module;
 
 export module getter;
 
-export namespace getter
-{
-  template <typename T, typename Deleter = std::default_delete<T>> class Getter
+export namespace getter {
+  template <typename T,                                //
+            typename Deleter = std::default_delete<T>> //
+  class Getter
   {
     std::shared_mutex   *mutex_;
     std::function<T *()> getter_;
@@ -24,15 +25,13 @@ export namespace getter
         : mutex_(mutex)
         , getter_(std::move(getter))
         , deleter_(Deleter{})
-    {
-    }
+    {}
 
     Getter(std::shared_mutex *mutex, std::function<T *()> getter, Deleter deleter)
         : mutex_(mutex)
         , getter_(std::move(getter))
         , deleter_(std::move(deleter))
-    {
-    }
+    {}
 
     ~Getter()
     {
@@ -44,14 +43,12 @@ export namespace getter
     {
       T *ref = cache_.load(std::memory_order_acquire);
 
-      if (ref == nullptr)
-      {
+      if (ref == nullptr) {
         std::unique_lock lock(*mutex_);
 
         ref = cache_.load(std::memory_order_acquire);
 
-        if (ref == nullptr)
-        {
+        if (ref == nullptr) {
           ref = getter_();
           cache_.store(ref);
         }
@@ -60,8 +57,16 @@ export namespace getter
       return ref;
     }
 
-    T *operator->() { return get(); }
+    T *operator->()
+    {
+      return get();
+    }
 
-    T &operator*() { return *get(); }
+    T &operator*()
+    {
+      return *get();
+    }
+
+    void asd() {}
   };
 } // namespace getter

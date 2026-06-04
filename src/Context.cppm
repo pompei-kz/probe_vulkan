@@ -10,8 +10,7 @@ import bean02;
 import bean03;
 import bean04;
 
-export namespace context
-{
+export namespace context {
   class Context
   {
     mutable std::shared_mutex mutex_;
@@ -24,7 +23,10 @@ export namespace context
   public:
     Context() = default;
 
-    bean01::Bean01 *get_bean01() { return bean01_.get(); }
+    bean01::Bean01 *get_bean01()
+    {
+      return bean01_.get();
+    }
 
   private:
     bean01::Bean01 *create_bean01()
