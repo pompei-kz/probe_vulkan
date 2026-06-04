@@ -1,13 +1,13 @@
 module;
 
-export module setting;
+export module settings;
 
 export namespace app {
   /// Bean setting
-  class Setting
+  class Settings
   {
-    int    argc_;
-    char **argv_;
+    int    argc_ = 0;
+    char **argv_ = nullptr;
 
   public:
     void readApplicationArguments(const int argc, char **argv)

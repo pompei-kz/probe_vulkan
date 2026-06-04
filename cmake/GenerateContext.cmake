@@ -1,5 +1,5 @@
 function(collect_bean_modules output_var source_dir)
-  file(GLOB candidate_modules CONFIGURE_DEPENDS "${source_dir}/*.cppm")
+  file(GLOB_RECURSE candidate_modules CONFIGURE_DEPENDS "${source_dir}/*.cppm")
   set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${candidate_modules})
 
   set(bean_modules "")
