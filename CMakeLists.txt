@@ -16,6 +16,12 @@ target_sources(
   PRIVATE
   FILE_SET CXX_MODULES
   FILES
+  src/Context.cppm
+  src/Bean01.cppm
+  src/Bean02.cppm
+  src/Bean03.cppm
+  src/Bean04.cppm
+  src/getter.cppm
   src/TriangleApplication.cppm
   src/utils.cppm
 )
