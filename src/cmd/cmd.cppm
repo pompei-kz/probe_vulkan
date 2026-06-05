@@ -20,11 +20,6 @@ export namespace cmd {
   struct CmdPrintToConsole : Cmd
   {
     std::string message;
-
-    ~CmdPrintToConsole()
-    {
-      std::cout << nowStr() << " OJkZuoWa62 :: Destroy CmdPrintToConsole: message = " << message << std::endl;
-    }
   };
 
 } // namespace cmd

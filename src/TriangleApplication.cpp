@@ -61,9 +61,9 @@ namespace {
     {
       // Описание привязки vertex buffer Vulkan.
       VkVertexInputBindingDescription binding{};
-      binding.binding   = 0;
-      binding.stride    = sizeof(Vertex);
-      binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+      binding.binding   = 0;                           // Номер binding для vertex buffer.
+      binding.stride    = sizeof(Vertex);              // Размер одной вершины в байтах.
+      binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX; // Данные читаются отдельно для каждой вершины.
       return binding;
     }
 
@@ -71,10 +71,10 @@ namespace {
     {
       // Описание атрибута позиции вершины Vulkan.
       std::array<VkVertexInputAttributeDescription, 1> attributes{};
-      attributes[0].binding  = 0;
-      attributes[0].location = 0;
-      attributes[0].format   = VK_FORMAT_R32G32B32_SFLOAT;
-      attributes[0].offset   = offsetof(Vertex, position);
+      attributes[0].binding  = 0;                          // Binding, из которого читается атрибут.
+      attributes[0].location = 0;                          // Location атрибута во входе vertex shader.
+      attributes[0].format   = VK_FORMAT_R32G32B32_SFLOAT; // Формат позиции: три float компонента.
+      attributes[0].offset   = offsetof(Vertex, position); // Смещение поля position внутри структуры Vertex.
       return attributes;
     }
   };
@@ -359,12 +359,12 @@ namespace app {
     {
       // Описание приложения для создания экземпляра Vulkan.
       VkApplicationInfo appInfo{};
-      appInfo.sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-      appInfo.pApplicationName   = "Vulkan Triangle";
-      appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-      appInfo.pEngineName        = "No Engine";
-      appInfo.engineVersion      = VK_MAKE_VERSION(1, 0, 0);
-      appInfo.apiVersion         = VK_API_VERSION_1_0;
+      appInfo.sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO; // Тип структуры с информацией о приложении.
+      appInfo.pApplicationName   = "Vulkan Triangle";                  // Имя приложения для драйвера и отладочных инструментов.
+      appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);           // Версия приложения.
+      appInfo.pEngineName        = "No Engine";                        // Имя движка, если он используется.
+      appInfo.engineVersion      = VK_MAKE_VERSION(1, 0, 0);           // Версия движка.
+      appInfo.apiVersion         = VK_API_VERSION_1_0;                 // Минимальная версия Vulkan API для приложения.
 
       Uint32 extensionCount         = 0;
       // Получаем список расширений Vulkan, которые нужны SDL.
@@ -376,10 +376,10 @@ namespace app {
 
       // Параметры создания экземпляра Vulkan.
       VkInstanceCreateInfo createInfo{};
-      createInfo.sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-      createInfo.pApplicationInfo        = &appInfo;
-      createInfo.enabledExtensionCount   = extensionCount;
-      createInfo.ppEnabledExtensionNames = extensions;
+      createInfo.sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO; // Тип структуры создания экземпляра Vulkan.
+      createInfo.pApplicationInfo        = &appInfo;                               // Указатель на описание приложения.
+      createInfo.enabledExtensionCount   = extensionCount;                         // Количество включаемых расширений экземпляра.
+      createInfo.ppEnabledExtensionNames = extensions;                             // Имена расширений экземпляра, нужных SDL.
 
       // Создаем экземпляр Vulkan.
       if (vkCreateInstance(&createInfo, nullptr, &instance_) != VK_SUCCESS) {
@@ -505,10 +505,10 @@ namespace app {
       for (uint32_t queueFamily : uniqueQueueFamilies) {
         // Описание очереди Vulkan для логического устройства.
         VkDeviceQueueCreateInfo queueCreateInfo{};
-        queueCreateInfo.sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-        queueCreateInfo.queueFamilyIndex = queueFamily;
-        queueCreateInfo.queueCount       = 1;
-        queueCreateInfo.pQueuePriorities = &queuePriority;
+        queueCreateInfo.sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO; // Тип структуры создания очереди устройства.
+        queueCreateInfo.queueFamilyIndex = queueFamily;                                // Индекс семейства очередей, из которого берется очередь.
+        queueCreateInfo.queueCount       = 1;                                          // Количество создаваемых очередей в этом семействе.
+        queueCreateInfo.pQueuePriorities = &queuePriority;                             // Приоритет очереди для планировщика устройства.
         queueCreateInfos.push_back(queueCreateInfo);
       }
 
@@ -517,12 +517,12 @@ namespace app {
 
       // Параметры создания логического устройства Vulkan.
       VkDeviceCreateInfo createInfo{};
-      createInfo.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-      createInfo.queueCreateInfoCount    = static_cast<uint32_t>(queueCreateInfos.size());
-      createInfo.pQueueCreateInfos       = queueCreateInfos.data();
-      createInfo.pEnabledFeatures        = &deviceFeatures;
-      createInfo.enabledExtensionCount   = static_cast<uint32_t>(kDeviceExtensions.size());
-      createInfo.ppEnabledExtensionNames = kDeviceExtensions.data();
+      createInfo.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;            // Тип структуры создания логического устройства.
+      createInfo.queueCreateInfoCount    = static_cast<uint32_t>(queueCreateInfos.size());  // Количество описаний очередей устройства.
+      createInfo.pQueueCreateInfos       = queueCreateInfos.data();                         // Описания очередей, которые нужно создать.
+      createInfo.pEnabledFeatures        = &deviceFeatures;                                 // Включаемые возможности физического устройства.
+      createInfo.enabledExtensionCount   = static_cast<uint32_t>(kDeviceExtensions.size()); // Количество расширений устройства.
+      createInfo.ppEnabledExtensionNames = kDeviceExtensions.data();                        // Имена включаемых расширений устройства.
 
       // Создаем логическое устройство Vulkan.
       if (vkCreateDevice(physicalDevice_, &createInfo, nullptr, &device_) != VK_SUCCESS) {
@@ -640,31 +640,31 @@ namespace app {
 
       // Параметры создания swap-chain Vulkan.
       VkSwapchainCreateInfoKHR createInfo{};
-      createInfo.sType            = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-      createInfo.surface          = surface_;
-      createInfo.minImageCount    = imageCount;
-      createInfo.imageFormat      = surfaceFormat.format;
-      createInfo.imageColorSpace  = surfaceFormat.colorSpace;
-      createInfo.imageExtent      = extent;
-      createInfo.imageArrayLayers = 1;
-      createInfo.imageUsage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+      createInfo.sType            = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR; // Тип структуры создания swap-chain.
+      createInfo.surface          = surface_;                                    // Surface окна, для которого создается swap-chain.
+      createInfo.minImageCount    = imageCount;                                  // Минимальное количество изображений в swap-chain.
+      createInfo.imageFormat      = surfaceFormat.format;                        // Формат пикселей изображений swap-chain.
+      createInfo.imageColorSpace  = surfaceFormat.colorSpace;                    // Цветовое пространство изображений swap-chain.
+      createInfo.imageExtent      = extent;                                      // Размер изображений swap-chain в пикселях.
+      createInfo.imageArrayLayers = 1;                                           // Количество слоев изображения, для обычного 2D окна нужен один.
+      createInfo.imageUsage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;         // Изображения будут использоваться как color attachment.
 
       const QueueFamilyIndices indices              = findQueueFamilies(physicalDevice_);
       const uint32_t           queueFamilyIndices[] = {*indices.graphicsFamily, *indices.presentFamily};
 
       if (indices.graphicsFamily != indices.presentFamily) {
-        createInfo.imageSharingMode      = VK_SHARING_MODE_CONCURRENT;
-        createInfo.queueFamilyIndexCount = 2;
-        createInfo.pQueueFamilyIndices   = queueFamilyIndices;
+        createInfo.imageSharingMode      = VK_SHARING_MODE_CONCURRENT; // Изображения доступны нескольким семействам очередей.
+        createInfo.queueFamilyIndexCount = 2;                          // Количество семейств очередей, которым нужен доступ.
+        createInfo.pQueueFamilyIndices   = queueFamilyIndices;         // Индексы графического и present семейств очередей.
       } else {
-        createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE; // Изображения принадлежат одному семейству очередей.
       }
 
-      createInfo.preTransform   = swapChainSupport.capabilities.currentTransform;
-      createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-      createInfo.presentMode    = presentMode;
-      createInfo.clipped        = VK_TRUE;
-      createInfo.oldSwapchain   = VK_NULL_HANDLE;
+      createInfo.preTransform   = swapChainSupport.capabilities.currentTransform; // Текущее преобразование surface перед показом.
+      createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;              // Альфа-канал окна не смешивается с другими окнами.
+      createInfo.presentMode    = presentMode;                                    // Режим показа изображений на экран.
+      createInfo.clipped        = VK_TRUE;                                        // Разрешаем не рисовать скрытые части окна.
+      createInfo.oldSwapchain   = VK_NULL_HANDLE;                                 // Старый swap-chain отсутствует при первом создании.
 
       // Создаем swap-chain Vulkan.
       if (vkCreateSwapchainKHR(device_, &createInfo, nullptr, &swapChain_) != VK_SUCCESS) {
@@ -689,19 +689,19 @@ namespace app {
       for (size_t i = 0; i < swapChainImages_.size(); ++i) {
         // Параметры создания image view Vulkan.
         VkImageViewCreateInfo createInfo{};
-        createInfo.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        createInfo.image                           = swapChainImages_[i];
-        createInfo.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
-        createInfo.format                          = swapChainImageFormat_;
-        createInfo.components.r                    = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.g                    = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.b                    = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.components.a                    = VK_COMPONENT_SWIZZLE_IDENTITY;
-        createInfo.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;
-        createInfo.subresourceRange.baseMipLevel   = 0;
-        createInfo.subresourceRange.levelCount     = 1;
-        createInfo.subresourceRange.baseArrayLayer = 0;
-        createInfo.subresourceRange.layerCount     = 1;
+        createInfo.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO; // Тип структуры создания image view.
+        createInfo.image                           = swapChainImages_[i];                      // Изображение swap-chain, для которого создается view.
+        createInfo.viewType                        = VK_IMAGE_VIEW_TYPE_2D;                    // Представление изображения как 2D texture.
+        createInfo.format                          = swapChainImageFormat_;                    // Формат данных изображения.
+        createInfo.components.r                    = VK_COMPONENT_SWIZZLE_IDENTITY;            // Красный канал остается без перестановки.
+        createInfo.components.g                    = VK_COMPONENT_SWIZZLE_IDENTITY;            // Зеленый канал остается без перестановки.
+        createInfo.components.b                    = VK_COMPONENT_SWIZZLE_IDENTITY;            // Синий канал остается без перестановки.
+        createInfo.components.a                    = VK_COMPONENT_SWIZZLE_IDENTITY;            // Альфа-канал остается без перестановки.
+        createInfo.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT;                // View обращается к цветовой части изображения.
+        createInfo.subresourceRange.baseMipLevel   = 0;                                        // Первый mip level для view.
+        createInfo.subresourceRange.levelCount     = 1;                                        // Количество mip levels в view.
+        createInfo.subresourceRange.baseArrayLayer = 0;                                        // Первый слой массива изображений.
+        createInfo.subresourceRange.layerCount     = 1;                                        // Количество слоев изображения в view.
 
         // Создаем image view Vulkan для изображения swap-chain.
         if (vkCreateImageView(device_, &createInfo, nullptr, &swapChainImageViews_[i]) != VK_SUCCESS) {
@@ -717,43 +717,43 @@ namespace app {
     {
       // Описание цветового attachment Vulkan.
       VkAttachmentDescription colorAttachment{};
-      colorAttachment.format         = swapChainImageFormat_;
-      colorAttachment.samples        = VK_SAMPLE_COUNT_1_BIT;
-      colorAttachment.loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR;
-      colorAttachment.storeOp        = VK_ATTACHMENT_STORE_OP_STORE;
-      colorAttachment.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-      colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-      colorAttachment.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
-      colorAttachment.finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+      colorAttachment.format         = swapChainImageFormat_;            // Формат color attachment совпадает с форматом swap-chain.
+      colorAttachment.samples        = VK_SAMPLE_COUNT_1_BIT;            // Multisampling отключен, используется один sample на пиксель.
+      colorAttachment.loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR;      // Перед рендерингом attachment очищается clear color.
+      colorAttachment.storeOp        = VK_ATTACHMENT_STORE_OP_STORE;     // После рендеринга результат сохраняется для показа.
+      colorAttachment.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;  // Stencil-данные не используются, их загрузка не важна.
+      colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // Stencil-данные не используются, их сохранение не важно.
+      colorAttachment.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;        // Предыдущее содержимое изображения не нужно.
+      colorAttachment.finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;  // После render pass изображение готово к показу.
 
       // Ссылка на цветовой attachment Vulkan.
       VkAttachmentReference colorAttachmentRef{};
-      colorAttachmentRef.attachment = 0;
-      colorAttachmentRef.layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+      colorAttachmentRef.attachment = 0;                                        // Индекс color attachment в массиве render pass attachments.
+      colorAttachmentRef.layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; // Layout attachment во время цветового рендеринга.
 
       // Описание subpass Vulkan.
       VkSubpassDescription subpass{};
-      subpass.pipelineBindPoint    = VK_PIPELINE_BIND_POINT_GRAPHICS;
-      subpass.colorAttachmentCount = 1;
-      subpass.pColorAttachments    = &colorAttachmentRef;
+      subpass.pipelineBindPoint    = VK_PIPELINE_BIND_POINT_GRAPHICS; // Subpass используется графическим pipeline.
+      subpass.colorAttachmentCount = 1;                               // В subpass используется один color attachment.
+      subpass.pColorAttachments    = &colorAttachmentRef;             // Ссылка на color attachment для вывода fragment shader.
 
       // Зависимость subpass Vulkan для синхронизации.
       VkSubpassDependency dependency{};
-      dependency.srcSubpass    = VK_SUBPASS_EXTERNAL;
-      dependency.dstSubpass    = 0;
-      dependency.srcStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-      dependency.dstStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-      dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+      dependency.srcSubpass    = VK_SUBPASS_EXTERNAL;                           // Источник зависимости находится вне render pass.
+      dependency.dstSubpass    = 0;                                             // Зависимость направлена в первый subpass.
+      dependency.srcStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT; // Ждем стадии вывода color attachment снаружи.
+      dependency.dstStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT; // Синхронизируемся перед стадией вывода color attachment.
+      dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;          // Разрешаем запись в color attachment после ожидания.
 
       // Параметры создания render pass Vulkan.
       VkRenderPassCreateInfo renderPassInfo{};
-      renderPassInfo.sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-      renderPassInfo.attachmentCount = 1;
-      renderPassInfo.pAttachments    = &colorAttachment;
-      renderPassInfo.subpassCount    = 1;
-      renderPassInfo.pSubpasses      = &subpass;
-      renderPassInfo.dependencyCount = 1;
-      renderPassInfo.pDependencies   = &dependency;
+      renderPassInfo.sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO; // Тип структуры создания render pass.
+      renderPassInfo.attachmentCount = 1;                                         // Количество attachments в render pass.
+      renderPassInfo.pAttachments    = &colorAttachment;                          // Описание color attachment.
+      renderPassInfo.subpassCount    = 1;                                         // Количество subpasses в render pass.
+      renderPassInfo.pSubpasses      = &subpass;                                  // Описание subpass.
+      renderPassInfo.dependencyCount = 1;                                         // Количество зависимостей subpass.
+      renderPassInfo.pDependencies   = &dependency;                               // Описание синхронизации subpass.
 
       // Создаем render pass Vulkan.
       if (vkCreateRenderPass(device_, &renderPassInfo, nullptr, &renderPass_) != VK_SUCCESS) {
@@ -765,9 +765,9 @@ namespace app {
     {
       // Параметры создания shader module Vulkan.
       VkShaderModuleCreateInfo createInfo{};
-      createInfo.sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-      createInfo.codeSize = code.size() * sizeof(uint32_t);
-      createInfo.pCode    = code.data();
+      createInfo.sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO; // Тип структуры создания shader module.
+      createInfo.codeSize = code.size() * sizeof(uint32_t);              // Размер SPIR-V байткода в байтах.
+      createInfo.pCode    = code.data();                                 // Указатель на SPIR-V байткод shader.
 
       // Дескриптор shader module Vulkan.
       VkShaderModule shaderModule = VK_NULL_HANDLE;
@@ -791,17 +791,17 @@ namespace app {
 
       // Стадия vertex shader Vulkan.
       VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
-      vertShaderStageInfo.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-      vertShaderStageInfo.stage  = VK_SHADER_STAGE_VERTEX_BIT;
-      vertShaderStageInfo.module = vertShaderModule;
-      vertShaderStageInfo.pName  = "main";
+      vertShaderStageInfo.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO; // Тип структуры стадии shader pipeline.
+      vertShaderStageInfo.stage  = VK_SHADER_STAGE_VERTEX_BIT;                          // Стадия vertex shader.
+      vertShaderStageInfo.module = vertShaderModule;                                    // Shader module с vertex shader.
+      vertShaderStageInfo.pName  = "main";                                              // Точка входа в shader module.
 
       // Стадия fragment shader Vulkan.
       VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
-      fragShaderStageInfo.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-      fragShaderStageInfo.stage  = VK_SHADER_STAGE_FRAGMENT_BIT;
-      fragShaderStageInfo.module = fragShaderModule;
-      fragShaderStageInfo.pName  = "main";
+      fragShaderStageInfo.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO; // Тип структуры стадии shader pipeline.
+      fragShaderStageInfo.stage  = VK_SHADER_STAGE_FRAGMENT_BIT;                        // Стадия fragment shader.
+      fragShaderStageInfo.module = fragShaderModule;                                    // Shader module с fragment shader.
+      fragShaderStageInfo.pName  = "main";                                              // Точка входа в shader module.
 
       // Список shader stages Vulkan.
       const VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
@@ -813,81 +813,82 @@ namespace app {
 
       // Описание входных вершин Vulkan.
       VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
-      vertexInputInfo.sType                           = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-      vertexInputInfo.vertexBindingDescriptionCount   = 1;
-      vertexInputInfo.pVertexBindingDescriptions      = &bindingDescription;
-      vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
-      vertexInputInfo.pVertexAttributeDescriptions    = attributeDescriptions.data();
+      vertexInputInfo.sType                           = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO; // Тип структуры vertex input.
+      vertexInputInfo.vertexBindingDescriptionCount   = 1;                                                         // Количество binding descriptions.
+      vertexInputInfo.pVertexBindingDescriptions      = &bindingDescription;                                 // Описание шага и binding vertex buffer.
+      vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size()); // Количество vertex attributes.
+      vertexInputInfo.pVertexAttributeDescriptions    = attributeDescriptions.data(); // Описание формата и location vertex attributes.
 
       // Описание сборки примитивов Vulkan.
       VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
-      inputAssembly.sType                  = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-      inputAssembly.topology               = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-      inputAssembly.primitiveRestartEnable = VK_FALSE;
+      inputAssembly.sType                  = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO; // Тип структуры input assembly.
+      inputAssembly.topology               = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST; // Каждые три вершины образуют отдельный треугольник.
+      inputAssembly.primitiveRestartEnable = VK_FALSE;                            // Primitive restart для индексов отключен.
 
       // Viewport Vulkan для области отрисовки.
       VkViewport viewport{};
-      viewport.x        = 0.0F;
-      viewport.y        = 0.0F;
-      viewport.width    = static_cast<float>(swapChainExtent_.width);
-      viewport.height   = static_cast<float>(swapChainExtent_.height);
-      viewport.minDepth = 0.0F;
-      viewport.maxDepth = 1.0F;
+      viewport.x        = 0.0F;                                        // Левая граница viewport.
+      viewport.y        = 0.0F;                                        // Верхняя граница viewport.
+      viewport.width    = static_cast<float>(swapChainExtent_.width);  // Ширина viewport равна ширине swap-chain.
+      viewport.height   = static_cast<float>(swapChainExtent_.height); // Высота viewport равна высоте swap-chain.
+      viewport.minDepth = 0.0F;                                        // Минимальная глубина viewport.
+      viewport.maxDepth = 1.0F;                                        // Максимальная глубина viewport.
 
       // Scissor Vulkan для ограничения области отрисовки.
       VkRect2D scissor{};
-      scissor.offset = {0, 0};
-      scissor.extent = swapChainExtent_;
+      scissor.offset = {0, 0};           // Начало прямоугольника scissor.
+      scissor.extent = swapChainExtent_; // Размер scissor равен размеру swap-chain.
 
       // Состояние viewport/scissor Vulkan.
       VkPipelineViewportStateCreateInfo viewportState{};
-      viewportState.sType         = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-      viewportState.viewportCount = 1;
-      viewportState.pViewports    = &viewport;
-      viewportState.scissorCount  = 1;
-      viewportState.pScissors     = &scissor;
+      viewportState.sType         = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO; // Тип структуры viewport state.
+      viewportState.viewportCount = 1;                                                     // Количество viewport в pipeline.
+      viewportState.pViewports    = &viewport;                                             // Описание viewport.
+      viewportState.scissorCount  = 1;                                                     // Количество scissor rectangles.
+      viewportState.pScissors     = &scissor;                                              // Описание scissor rectangle.
 
       // Состояние растеризации Vulkan.
       VkPipelineRasterizationStateCreateInfo rasterizer{};
-      rasterizer.sType                   = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-      rasterizer.depthClampEnable        = VK_FALSE;
-      rasterizer.rasterizerDiscardEnable = VK_FALSE;
-      rasterizer.polygonMode             = VK_POLYGON_MODE_FILL;
-      rasterizer.lineWidth               = 1.0F;
-      rasterizer.cullMode                = VK_CULL_MODE_NONE;
-      rasterizer.frontFace               = VK_FRONT_FACE_CLOCKWISE;
-      rasterizer.depthBiasEnable         = VK_FALSE;
+      rasterizer.sType                   = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO; // Тип структуры rasterization state.
+      rasterizer.depthClampEnable        = VK_FALSE;                                                   // Обрезаем фрагменты вне диапазона глубины.
+      rasterizer.rasterizerDiscardEnable = VK_FALSE;                                                   // Растеризация включена.
+      rasterizer.polygonMode             = VK_POLYGON_MODE_FILL;                                       // Треугольники заполняются целиком.
+      rasterizer.lineWidth               = 1.0F;                                                       // Толщина линий для line topology.
+      rasterizer.cullMode                = VK_CULL_MODE_NONE;                                          // Отсечение граней отключено.
+      rasterizer.frontFace               = VK_FRONT_FACE_CLOCKWISE; // Вершины по часовой стрелке считаются лицевой стороной.
+      rasterizer.depthBiasEnable         = VK_FALSE;                // Depth bias отключен.
 
       // Состояние multisampling Vulkan.
       VkPipelineMultisampleStateCreateInfo multisampling{};
-      multisampling.sType                = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-      multisampling.sampleShadingEnable  = VK_FALSE;
-      multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+      multisampling.sType                = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO; // Тип структуры multisample state.
+      multisampling.sampleShadingEnable  = VK_FALSE;                                                 // Sample shading отключен.
+      multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT; // Multisampling отключен, один sample на пиксель.
 
       // Настройки color blending Vulkan для attachment.
       VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-      colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-      colorBlendAttachment.blendEnable    = VK_FALSE;
+      colorBlendAttachment.colorWriteMask =
+          VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT; // Разрешаем запись RGBA каналов.
+      colorBlendAttachment.blendEnable = VK_FALSE;                                                                   // Смешивание цветов отключено.
 
       // Состояние color blending Vulkan.
       VkPipelineColorBlendStateCreateInfo colorBlending{};
-      colorBlending.sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-      colorBlending.logicOpEnable   = VK_FALSE;
-      colorBlending.attachmentCount = 1;
-      colorBlending.pAttachments    = &colorBlendAttachment;
+      colorBlending.sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO; // Тип структуры color blend state.
+      colorBlending.logicOpEnable   = VK_FALSE;                                                 // Логические операции смешивания отключены.
+      colorBlending.attachmentCount = 1;                                                        // Количество настроек blending для attachments.
+      colorBlending.pAttachments    = &colorBlendAttachment;                                    // Настройки blending для color attachment.
 
       // Layout pipeline Vulkan.
       // Диапазон push constants Vulkan для матриц трансформации.
       VkPushConstantRange pushConstantRange{};
-      pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-      pushConstantRange.offset     = 0;
-      pushConstantRange.size       = sizeof(PushConstants);
+      pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT; // Push constants доступны vertex shader.
+      pushConstantRange.offset     = 0;                          // Смещение диапазона push constants.
+      pushConstantRange.size       = sizeof(PushConstants);      // Размер данных push constants.
 
       // Layout pipeline Vulkan.
       VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-      pipelineLayoutInfo.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-      pipelineLayoutInfo.pushConstantRangeCount = 1;
-      pipelineLayoutInfo.pPushConstantRanges    = &pushConstantRange;
+      pipelineLayoutInfo.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO; // Тип структуры создания pipeline layout.
+      pipelineLayoutInfo.pushConstantRangeCount = 1;                                             // Количество диапазонов push constants.
+      pipelineLayoutInfo.pPushConstantRanges    = &pushConstantRange;                            // Описание диапазона push constants.
 
       // Создаем layout pipeline Vulkan.
       if (vkCreatePipelineLayout(device_, &pipelineLayoutInfo, nullptr, &pipelineLayout_) != VK_SUCCESS) {
@@ -896,18 +897,18 @@ namespace app {
 
       // Параметры создания графического pipeline Vulkan.
       VkGraphicsPipelineCreateInfo pipelineInfo{};
-      pipelineInfo.sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-      pipelineInfo.stageCount          = 2;
-      pipelineInfo.pStages             = shaderStages;
-      pipelineInfo.pVertexInputState   = &vertexInputInfo;
-      pipelineInfo.pInputAssemblyState = &inputAssembly;
-      pipelineInfo.pViewportState      = &viewportState;
-      pipelineInfo.pRasterizationState = &rasterizer;
-      pipelineInfo.pMultisampleState   = &multisampling;
-      pipelineInfo.pColorBlendState    = &colorBlending;
-      pipelineInfo.layout              = pipelineLayout_;
-      pipelineInfo.renderPass          = renderPass_;
-      pipelineInfo.subpass             = 0;
+      pipelineInfo.sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO; // Тип структуры создания graphics pipeline.
+      pipelineInfo.stageCount          = 2;                                               // Количество shader stages.
+      pipelineInfo.pStages             = shaderStages;                                    // Описания vertex и fragment shader stages.
+      pipelineInfo.pVertexInputState   = &vertexInputInfo;                                // Описание входных vertex данных.
+      pipelineInfo.pInputAssemblyState = &inputAssembly;                                  // Описание сборки примитивов.
+      pipelineInfo.pViewportState      = &viewportState;                                  // Описание viewport и scissor.
+      pipelineInfo.pRasterizationState = &rasterizer;                                     // Описание растеризации.
+      pipelineInfo.pMultisampleState   = &multisampling;                                  // Описание multisampling.
+      pipelineInfo.pColorBlendState    = &colorBlending;                                  // Описание color blending.
+      pipelineInfo.layout              = pipelineLayout_;                                 // Pipeline layout с push constants.
+      pipelineInfo.renderPass          = renderPass_;                                     // Render pass, с которым совместим pipeline.
+      pipelineInfo.subpass             = 0;                                               // Индекс subpass внутри render pass.
 
       // Создаем графический pipeline Vulkan.
       if (vkCreateGraphicsPipelines(device_, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline_) != VK_SUCCESS) {
@@ -930,13 +931,13 @@ namespace app {
 
         // Параметры создания framebuffer Vulkan.
         VkFramebufferCreateInfo framebufferInfo{};
-        framebufferInfo.sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-        framebufferInfo.renderPass      = renderPass_;
-        framebufferInfo.attachmentCount = 1;
-        framebufferInfo.pAttachments    = attachments;
-        framebufferInfo.width           = swapChainExtent_.width;
-        framebufferInfo.height          = swapChainExtent_.height;
-        framebufferInfo.layers          = 1;
+        framebufferInfo.sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO; // Тип структуры создания framebuffer.
+        framebufferInfo.renderPass      = renderPass_;                               // Render pass, для которого создается framebuffer.
+        framebufferInfo.attachmentCount = 1;                                         // Количество attachments framebuffer.
+        framebufferInfo.pAttachments    = attachments;                               // Image view swap-chain как attachment framebuffer.
+        framebufferInfo.width           = swapChainExtent_.width;                    // Ширина framebuffer.
+        framebufferInfo.height          = swapChainExtent_.height;                   // Высота framebuffer.
+        framebufferInfo.layers          = 1;                                         // Количество слоев framebuffer.
 
         // Создаем framebuffer Vulkan.
         if (vkCreateFramebuffer(device_, &framebufferInfo, nullptr, &swapChainFramebuffers_[i]) != VK_SUCCESS) {
@@ -951,9 +952,9 @@ namespace app {
 
       // Параметры создания command pool Vulkan.
       VkCommandPoolCreateInfo poolInfo{};
-      poolInfo.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-      poolInfo.flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-      poolInfo.queueFamilyIndex = *queueFamilyIndices.graphicsFamily;
+      poolInfo.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;      // Тип структуры создания command pool.
+      poolInfo.flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT; // Разрешаем сбрасывать command buffers по отдельности.
+      poolInfo.queueFamilyIndex = *queueFamilyIndices.graphicsFamily;              // Семейство очередей, для которого создается command pool.
 
       // Создаем command pool Vulkan.
       if (vkCreateCommandPool(device_, &poolInfo, nullptr, &commandPool_) != VK_SUCCESS) {
@@ -986,10 +987,10 @@ namespace app {
     {
       // Параметры создания buffer Vulkan.
       VkBufferCreateInfo bufferInfo{};
-      bufferInfo.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-      bufferInfo.size        = size;
-      bufferInfo.usage       = usage;
-      bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+      bufferInfo.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO; // Тип структуры создания buffer.
+      bufferInfo.size        = size;                                 // Размер buffer в байтах.
+      bufferInfo.usage       = usage;                                // Назначение buffer: vertex, index или другое.
+      bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;            // Buffer используется одним семейством очередей.
 
       // Создаем buffer Vulkan.
       if (vkCreateBuffer(device_, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
@@ -1003,9 +1004,9 @@ namespace app {
 
       // Параметры выделения памяти Vulkan.
       VkMemoryAllocateInfo allocInfo{};
-      allocInfo.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-      allocInfo.allocationSize  = memoryRequirements.size;
-      allocInfo.memoryTypeIndex = findMemoryType(memoryRequirements.memoryTypeBits, properties);
+      allocInfo.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;                        // Тип структуры выделения памяти.
+      allocInfo.allocationSize  = memoryRequirements.size;                                       // Размер выделяемой памяти.
+      allocInfo.memoryTypeIndex = findMemoryType(memoryRequirements.memoryTypeBits, properties); // Индекс подходящего типа памяти.
 
       // Выделяем память Vulkan для buffer.
       if (vkAllocateMemory(device_, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
@@ -1060,10 +1061,10 @@ namespace app {
 
       // Параметры выделения command buffers Vulkan.
       VkCommandBufferAllocateInfo allocInfo{};
-      allocInfo.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-      allocInfo.commandPool        = commandPool_;
-      allocInfo.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-      allocInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers_.size());
+      allocInfo.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO; // Тип структуры выделения command buffers.
+      allocInfo.commandPool        = commandPool_;                                   // Command pool, из которого выделяются command buffers.
+      allocInfo.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;                // Primary command buffers можно отправлять в очередь напрямую.
+      allocInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers_.size());  // Количество выделяемых command buffers.
 
       // Выделяем command buffers Vulkan.
       if (vkAllocateCommandBuffers(device_, &allocInfo, commandBuffers_.data()) != VK_SUCCESS) {
@@ -1075,7 +1076,7 @@ namespace app {
     {
       // Параметры начала записи command buffer Vulkan.
       VkCommandBufferBeginInfo beginInfo{};
-      beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+      beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO; // Тип структуры начала записи command buffer.
 
       // Начинаем запись command buffer Vulkan.
       if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
@@ -1084,16 +1085,16 @@ namespace app {
 
       // Параметры начала render pass Vulkan.
       VkRenderPassBeginInfo renderPassInfo{};
-      renderPassInfo.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-      renderPassInfo.renderPass        = renderPass_;
-      renderPassInfo.framebuffer       = swapChainFramebuffers_[imageIndex];
-      renderPassInfo.renderArea.offset = {0, 0};
-      renderPassInfo.renderArea.extent = swapChainExtent_;
+      renderPassInfo.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO; // Тип структуры начала render pass.
+      renderPassInfo.renderPass        = renderPass_;                              // Render pass, который нужно начать.
+      renderPassInfo.framebuffer       = swapChainFramebuffers_[imageIndex];       // Framebuffer для текущего изображения swap-chain.
+      renderPassInfo.renderArea.offset = {0, 0};                                   // Начало области рендеринга.
+      renderPassInfo.renderArea.extent = swapChainExtent_;                         // Размер области рендеринга.
 
       // Цвет очистки Vulkan.
       constexpr VkClearValue clearColor = {{{0.02F, 0.03F, 0.05F, 1.0F}}};
-      renderPassInfo.clearValueCount    = 1;
-      renderPassInfo.pClearValues       = &clearColor;
+      renderPassInfo.clearValueCount    = 1;           // Количество значений очистки attachments.
+      renderPassInfo.pClearValues       = &clearColor; // Цвет, которым очищается color attachment.
 
       // Начинаем render pass Vulkan.
       vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
@@ -1129,12 +1130,12 @@ namespace app {
 
       // Параметры создания semaphore Vulkan.
       VkSemaphoreCreateInfo semaphoreInfo{};
-      semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+      semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO; // Тип структуры создания semaphore.
 
       // Параметры создания fence Vulkan.
       VkFenceCreateInfo fenceInfo{};
-      fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-      fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+      fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO; // Тип структуры создания fence.
+      fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;        // Fence создается уже signaled, чтобы первый кадр не завис.
 
       for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
         // Создаем semaphore Vulkan для ожидания изображения.
@@ -1186,14 +1187,14 @@ namespace app {
 
       // Параметры отправки команд Vulkan в очередь.
       VkSubmitInfo submitInfo{};
-      submitInfo.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-      submitInfo.waitSemaphoreCount   = 1;
-      submitInfo.pWaitSemaphores      = waitSemaphores;
-      submitInfo.pWaitDstStageMask    = waitStages;
-      submitInfo.commandBufferCount   = 1;
-      submitInfo.pCommandBuffers      = &commandBuffers_[currentFrame_];
-      submitInfo.signalSemaphoreCount = 1;
-      submitInfo.pSignalSemaphores    = signalSemaphores;
+      submitInfo.sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO;   // Тип структуры отправки команд в очередь.
+      submitInfo.waitSemaphoreCount   = 1;                               // Количество semaphores, которых ждет очередь.
+      submitInfo.pWaitSemaphores      = waitSemaphores;                  // Semaphore доступности изображения swap-chain.
+      submitInfo.pWaitDstStageMask    = waitStages;                      // Стадия pipeline, на которой выполняется ожидание.
+      submitInfo.commandBufferCount   = 1;                               // Количество отправляемых command buffers.
+      submitInfo.pCommandBuffers      = &commandBuffers_[currentFrame_]; // Command buffer текущего кадра.
+      submitInfo.signalSemaphoreCount = 1;                               // Количество semaphores, которые будут просигналены.
+      submitInfo.pSignalSemaphores    = signalSemaphores;                // Semaphore завершения рендеринга.
 
       // Отправляем command buffer Vulkan в графическую очередь.
       if (vkQueueSubmit(graphicsQueue_, 1, &submitInfo, inFlightFences_[currentFrame_]) != VK_SUCCESS) {
@@ -1202,12 +1203,12 @@ namespace app {
 
       // Параметры показа изображения Vulkan.
       VkPresentInfoKHR presentInfo{};
-      presentInfo.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-      presentInfo.waitSemaphoreCount = 1;
-      presentInfo.pWaitSemaphores    = signalSemaphores;
-      presentInfo.swapchainCount     = 1;
-      presentInfo.pSwapchains        = &swapChain_;
-      presentInfo.pImageIndices      = &imageIndex;
+      presentInfo.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR; // Тип структуры показа изображения.
+      presentInfo.waitSemaphoreCount = 1;                                  // Количество semaphores перед показом.
+      presentInfo.pWaitSemaphores    = signalSemaphores;                   // Ждем завершения рендеринга перед показом.
+      presentInfo.swapchainCount     = 1;                                  // Количество swap-chains для показа.
+      presentInfo.pSwapchains        = &swapChain_;                        // Swap-chain, из которого показываем изображение.
+      presentInfo.pImageIndices      = &imageIndex;                        // Индекс изображения swap-chain для показа.
 
       // Показываем изображение swap-chain Vulkan.
       result = vkQueuePresentKHR(presentQueue_, &presentInfo);

@@ -18,15 +18,14 @@ export std::filesystem::path executableBasePath()
 
 export std::string nowStr()
 {
-  const std::chrono::time_point<std::chrono::system_clock> tp = std::chrono::system_clock::now();
-
-  const std::chrono::zoned_time tz{"Asia/Almaty", tp};
-
-  const auto localTp = tz.get_local_time();
-
-  const std::string time = std::format("{:%Y-%m-%d %H:%M:%S}.{:06}",
-                                       std::chrono::floor<std::chrono::seconds>(localTp),
-                                       std::chrono::duration_cast<std::chrono::microseconds>(tp.time_since_epoch()).count() % 1000000);
+  const auto                           tp = std::chrono::system_clock::now();
+  const std::chrono::time_zone *const  tz = std::chrono::current_zone();
+  const std::chrono::zoned_time        zt{tz, tp};
+  const auto                           localTp    = zt.get_local_time();
+  const auto                           time_point = std::chrono::floor<std::chrono::seconds>(localTp);
+  const std::chrono::microseconds      eid        = std::chrono::duration_cast<std::chrono::microseconds>(tp.time_since_epoch());
+  const std::chrono::microseconds::rep count      = eid.count() % 1000000;
+  const std::string                    time       = std::format("{:%Y-%m-%d %H:%M:%S}.{:06}", time_point, count);
 
   return time;
 }
