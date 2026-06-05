@@ -27,6 +27,7 @@ target_sources(
   ${GENERATED_CONTEXT_MODULE}
   src/getter.cppm
   src/utils.cppm
+  src/cmd/cmd.cppm
 )
 
 target_sources(

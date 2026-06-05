@@ -1,8 +1,11 @@
 module;
 
 #include <iostream>
+#include <memory>
 
 export module server;
+import cmd;
+import utils;
 
 export namespace server {
   /// Bean server
@@ -11,15 +14,16 @@ export namespace server {
     float number = 8.09F;
 
   public:
-    void hello()
+    cmd::CmdPtr start()
     {
-      number += 2;
-      std::cout << "nexoPVpZod :: Hello from Server: number=" << number << std::endl;
+      auto ret     = std::make_shared<cmd::CmdPrintToConsole>();
+      ret->message = "js5y3c3ST4 :: Hello from CMD";
+      return ret;
     }
 
     ~Server()
     {
-      std::cout << "ZZzYOtuBsD :: Server are destroying..." << std::endl;
+      std::cout << nowStr() << " ZZzYOtuBsD :: Server are destroying..." << std::endl;
     }
   };
 } // namespace server

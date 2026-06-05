@@ -3,7 +3,9 @@ import triangle_application;
 #include <cstdlib>
 #include <exception>
 #include <iostream>
+#include <memory>
 import context;
+import cmd;
 
 int main(const int argc, char **argv)
 {
@@ -11,11 +13,10 @@ int main(const int argc, char **argv)
     context::Context context;
     context.get_setting()->readApplicationArguments(argc, argv);
 
-    context.get_server()->hello();
-
     app::TriangleApplication *application = context.get_application();
 
-    application->run("/start/entry-point");
+    application->run([&context] { return context.get_server()->start(); });
+
   } catch (const std::exception &error) {
     std::cerr << error.what() << '\n';
     return EXIT_FAILURE;

@@ -1,10 +1,12 @@
 module;
 
+#include <functional>
 #include <memory>
 
 export module triangle_application;
 import settings;
 import getter;
+import cmd;
 
 export namespace app {
   /// Bean application app::Settings
@@ -17,7 +19,7 @@ export namespace app {
     TriangleApplication(const TriangleApplication &)            = delete;
     TriangleApplication &operator=(const TriangleApplication &) = delete;
 
-    void run(const std::string &startPoint);
+    void run(cmd::CmdFactory startCmdGetter);
 
   private:
     struct Impl;

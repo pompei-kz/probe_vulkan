@@ -13,11 +13,15 @@ module;
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <filesystem>
+#include <format>
 #include <fstream>
+#include <functional>
+#include <iostream>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -31,6 +35,7 @@ module triangle_application;
 import utils;
 import getter;
 import settings;
+import cmd;
 
 namespace {
 
@@ -231,12 +236,31 @@ namespace app {
         : setting_(setting)
     {}
 
-    void run(const std::string &startPoint)
+    void run(cmd::CmdFactory startCmdFactory)
     {
       initWindow();
       initVulkan();
+      executeCmd(startCmdFactory());
       mainLoop();
       cleanup();
+    }
+
+    void executeCmd(cmd::CmdPtr cmdPtr)
+    {
+      if (!cmdPtr) return;
+
+      if (const auto printToConsole = std::dynamic_pointer_cast<cmd::CmdPrintToConsole>(cmdPtr)) {
+        executeCmd_PrintToConsole(printToConsole);
+        return;
+      }
+
+      std::cout << nowStr() << " t17HETHHeE :: Unknown cmd " << typeid(*cmdPtr).name() << std::endl;
+    }
+
+    // ReSharper disable once CppPassValueParameterByConstReference
+    static void executeCmd_PrintToConsole(const std::shared_ptr<cmd::CmdPrintToConsole> cmdPtr)
+    {
+      std::cout << nowStr() << " " << cmdPtr->message << std::endl;
     }
 
     void initWindow()
@@ -1260,9 +1284,9 @@ namespace app {
   TriangleApplication::~TriangleApplication() = default;
 
   // ReSharper disable once CppMemberFunctionMayBeConst
-  void TriangleApplication::run(const std::string &startPoint)
+  void TriangleApplication::run(cmd::CmdFactory startCmdGetter)
   {
-    impl_->run(startPoint);
+    impl_->run(startCmdGetter);
   }
 
 } // namespace app
