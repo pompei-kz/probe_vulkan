@@ -32,6 +32,7 @@ target_sources(
   src/utils/sync_queue.cppm
   src/cmd/cmd.cppm
   src/cmd/pipeline.cppm
+  src/TriangleApplicationVulkanInit.cppm
 )
 
 target_sources(
