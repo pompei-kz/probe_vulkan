@@ -36,6 +36,7 @@ import utils;
 import getter;
 import settings;
 import cmd;
+import pipeline;
 
 namespace {
 
@@ -240,17 +241,21 @@ namespace app {
     {
       initWindow();
       initVulkan();
-      executeCmd(startCmdFactory());
+      execute_Cmd(startCmdFactory());
       mainLoop();
       cleanup();
     }
 
-    void executeCmd(cmd::CmdPtr cmdPtr)
+    void execute_Cmd(cmd::CmdPtr cmdPtr)
     {
       if (!cmdPtr) return;
 
       if (const auto printToConsole = std::dynamic_pointer_cast<cmd::CmdPrintToConsole>(cmdPtr)) {
-        executeCmd_PrintToConsole(printToConsole);
+        execute_CmdPrintToConsole(printToConsole);
+        return;
+      }
+      if (const auto printToConsole = std::dynamic_pointer_cast<cmd::CmdPipeline_ShapeGroup_Materials>(cmdPtr)) {
+        execute_CmdPipeline_ShapeGroup_Materials(printToConsole);
         return;
       }
 
@@ -258,9 +263,14 @@ namespace app {
     }
 
     // ReSharper disable once CppPassValueParameterByConstReference
-    static void executeCmd_PrintToConsole(const std::shared_ptr<cmd::CmdPrintToConsole> cmdPtr)
+    static void execute_CmdPrintToConsole(const std::shared_ptr<cmd::CmdPrintToConsole> cmdPtr)
     {
       std::cout << nowStr() << " " << cmdPtr->message << std::endl;
+    }
+
+    static void execute_CmdPipeline_ShapeGroup_Materials(const std::shared_ptr<cmd::CmdPipeline_ShapeGroup_Materials> cmdPtr)
+    {
+      std::cout << nowStr() << " " << cmdPtr->hello << std::endl;
     }
 
     void initWindow()

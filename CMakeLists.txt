@@ -28,6 +28,7 @@ target_sources(
   src/getter.cppm
   src/utils.cppm
   src/cmd/cmd.cppm
+  src/cmd/pipeline.cppm
 )
 
 target_sources(

@@ -6,6 +6,7 @@ module;
 export module server;
 import cmd;
 import utils;
+import pipeline;
 
 export namespace server {
   /// Bean server
@@ -16,8 +17,8 @@ export namespace server {
   public:
     cmd::CmdPtr start()
     {
-      auto ret     = std::make_shared<cmd::CmdPrintToConsole>();
-      ret->message = "js5y3c3ST4 :: Hello from CMD";
+      auto ret     = std::make_shared<cmd::CmdPipeline_ShapeGroup_Materials>();
+      ret->hello = "ueUJb97odQ :: Hello from CMD";
       return ret;
     }
 
