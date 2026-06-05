@@ -17,8 +17,8 @@ export namespace server {
   public:
     cmd::CmdPtr start()
     {
-      auto ret     = std::make_shared<cmd::CmdPipeline_ShapeGroup_Materials>();
-      ret->hello = "ueUJb97odQ :: Hello from CMD";
+      auto ret = std::make_shared<cmd::CmdPipeline_ShapeGroup_Materials>();
+      ret->id  = "fp7c4pmXp1 :: super  pipeline";
       return ret;
     }
 

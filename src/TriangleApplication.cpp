@@ -37,6 +37,8 @@ import getter;
 import settings;
 import cmd;
 import pipeline;
+import sync_map;
+import sync_linked_list;
 
 namespace {
 
@@ -128,6 +130,10 @@ namespace {
     std::vector<VkSurfaceFormatKHR> formats;
     // Доступные режимы показа Vulkan.
     std::vector<VkPresentModeKHR> presentModes;
+  };
+
+  struct Pipeline
+  {
   };
 
   std::string readTextFile(const std::filesystem::path &path)
@@ -233,6 +239,10 @@ namespace app {
 
     getter::Getter<Settings> &setting_;
 
+    std::unordered_map<std::string, Pipeline> pipelines_;
+
+    sync::SyncQueue<cmd::CmdPtr> commands;
+
     Impl(getter::Getter<Settings> &setting)
         : setting_(setting)
     {}
@@ -248,7 +258,9 @@ namespace app {
 
     void execute_Cmd(cmd::CmdPtr cmdPtr)
     {
-      if (!cmdPtr) return;
+      const cmd::Cmd *pointer = cmdPtr.get();
+
+      if (!pointer) return;
 
       if (const auto printToConsole = std::dynamic_pointer_cast<cmd::CmdPrintToConsole>(cmdPtr)) {
         execute_CmdPrintToConsole(printToConsole);
@@ -259,7 +271,7 @@ namespace app {
         return;
       }
 
-      std::cout << nowStr() << " t17HETHHeE :: Unknown cmd " << typeid(*cmdPtr).name() << std::endl;
+      std::cout << nowStr() << " t17HETHHeE :: Unknown cmd " << typeid(*pointer).name() << std::endl;
     }
 
     // ReSharper disable once CppPassValueParameterByConstReference
@@ -270,7 +282,8 @@ namespace app {
 
     static void execute_CmdPipeline_ShapeGroup_Materials(const std::shared_ptr<cmd::CmdPipeline_ShapeGroup_Materials> cmdPtr)
     {
-      std::cout << nowStr() << " " << cmdPtr->hello << std::endl;
+      // TODO implements it. Command applies pipeline: cmd::CmdPipeline_ShapeGroup_Materials.
+      // TODO pipeline has id. If pipeline with this id already exists
     }
 
     void initWindow()

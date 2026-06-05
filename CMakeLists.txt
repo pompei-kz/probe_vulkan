@@ -26,7 +26,10 @@ target_sources(
   FILES
   ${GENERATED_CONTEXT_MODULE}
   src/getter.cppm
-  src/utils.cppm
+  src/utils/utils.cppm
+  src/utils/sync_map.cppm
+  src/utils/sync_vector.cppm
+  src/utils/sync_queue.cppm
   src/cmd/cmd.cppm
   src/cmd/pipeline.cppm
 )
