@@ -124,10 +124,24 @@ namespace app {
   export class VulkanInit
   {
   public:
-    void init(SDL_Window *window);
+    void setWindow(SDL_Window *window);
     void waitIdle() const;
     void cleanup();
     void drawFrame(bool &framebufferResized);
+    void createInstance();
+    void createSurface();
+    void pickPhysicalDevice();
+    void createLogicalDevice();
+    void createSwapChain();
+    void createImageViews();
+    void createRenderPass();
+    void createGraphicsPipeline();
+    void createFramebuffers();
+    void createCommandPool();
+    void createVertexBuffer();
+    void createIndexBuffer();
+    void createCommandBuffers();
+    void createSyncObjects();
 
   private:
     SDL_Window *window_ = nullptr;
@@ -194,26 +208,15 @@ namespace app {
     };
     PushConstants pushConstants_{};
 
-    void initVulkan();
-    void createInstance();
-    void createSurface();
-    void pickPhysicalDevice();
     bool isDeviceSuitable(const VkPhysicalDevice device) const;
     static bool checkDeviceExtensionSupport(const VkPhysicalDevice device);
     QueueFamilyIndices findQueueFamilies(const VkPhysicalDevice device) const;
-    void createLogicalDevice();
     SwapChainSupport querySwapChainSupport(const VkPhysicalDevice device) const;
     static VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &formats);
     static VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR> &presentModes);
     [[nodiscard]] VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities) const;
     void updateTransformMatrices();
-    void createSwapChain();
-    void createImageViews();
-    void createRenderPass();
     [[nodiscard]] VkShaderModule createShaderModule(const std::vector<uint32_t> &code) const;
-    void createGraphicsPipeline();
-    void createFramebuffers();
-    void createCommandPool();
     [[nodiscard]] uint32_t findMemoryType(const uint32_t typeFilter, const VkMemoryPropertyFlags properties) const;
     void createBuffer(const VkDeviceSize          size,
                       const VkBufferUsageFlags    usage,
@@ -221,11 +224,7 @@ namespace app {
                       VkBuffer                   &buffer,
                       VkDeviceMemory             &bufferMemory) const;
     void uploadBufferData(const VkDeviceMemory bufferMemory, const void *source, const VkDeviceSize size) const;
-    void createVertexBuffer();
-    void createIndexBuffer();
-    void createCommandBuffers();
     void recordCommandBuffer(const VkCommandBuffer commandBuffer, const uint32_t imageIndex) const;
-    void createSyncObjects();
     void recreateSwapChain();
     void cleanupSwapChain();
   };
@@ -268,28 +267,9 @@ namespace {
 
 namespace app {
 
-  void VulkanInit::init(SDL_Window *window)
+  void VulkanInit::setWindow(SDL_Window *window)
   {
     window_ = window;
-    initVulkan();
-  }
-
-  void VulkanInit::initVulkan()
-  {
-    createInstance();
-    createSurface();
-    pickPhysicalDevice();
-    createLogicalDevice();
-    createSwapChain();
-    createImageViews();
-    createRenderPass();
-    createGraphicsPipeline();
-    createFramebuffers();
-    createCommandPool();
-    createVertexBuffer();
-    createIndexBuffer();
-    createCommandBuffers();
-    createSyncObjects();
   }
 
   void VulkanInit::createInstance()

@@ -55,7 +55,7 @@ namespace app {
     void run(cmd::CmdFactory startCmdFactory)
     {
       initWindow();
-      vulkan_.init(window_);
+      initVulkan();
       execute_Cmd(startCmdFactory());
       mainLoop();
       cleanup();
@@ -105,6 +105,25 @@ namespace app {
         // Получаем текст ошибки SDL.
         throw std::runtime_error(std::string("aT5sJ9qBvE :: ") + SDL_GetError());
       }
+    }
+
+    void initVulkan()
+    {
+      vulkan_.setWindow(window_);
+      vulkan_.createInstance();
+      vulkan_.createSurface();
+      vulkan_.pickPhysicalDevice();
+      vulkan_.createLogicalDevice();
+      vulkan_.createSwapChain();
+      vulkan_.createImageViews();
+      vulkan_.createRenderPass();
+      vulkan_.createGraphicsPipeline();
+      vulkan_.createFramebuffers();
+      vulkan_.createCommandPool();
+      vulkan_.createVertexBuffer();
+      vulkan_.createIndexBuffer();
+      vulkan_.createCommandBuffers();
+      vulkan_.createSyncObjects();
     }
 
     void mainLoop()
