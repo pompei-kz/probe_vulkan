@@ -7,7 +7,7 @@ module;
 
 export module server;
 import cmd;
-import utils;
+import util;
 import cmd_pipeline;
 import cmd_light;
 import generator;
@@ -86,7 +86,7 @@ export namespace server {
 
     ~Server()
     {
-      std::cout << nowStr() << " ZZzYOtuBsD :: Server are destroying..." << std::endl;
+      std::cout << util::nowStr() << " ZZzYOtuBsD :: Server are destroying..." << std::endl;
     }
   };
 } // namespace server

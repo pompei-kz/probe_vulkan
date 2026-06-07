@@ -6,50 +6,13 @@ module;
 
 #include <array>
 #include <cstddef>
-#include <cstdint>
 #include <filesystem>
-#include <fstream>
 #include <stdexcept>
-#include <string>
 #include <vector>
 
 export module vulkanPipeline;
 
-import utils;
-
-namespace {
-
-  std::string readTextFile(const std::filesystem::path &path)
-  {
-    std::ifstream file(path, std::ios::ate);
-
-    if (!file.is_open()) {
-      throw std::runtime_error("kQw7nPz4Lm :: failed to open " + path.string());
-    }
-
-    const size_t fileSize = file.tellg();
-    std::string  buffer(fileSize, '\0');
-    file.seekg(0);
-    file.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
-    return buffer;
-  }
-
-  std::vector<uint32_t> compileShader(const std::filesystem::path &path, const shaderc_shader_kind shaderKind)
-  {
-    const std::string source     = readTextFile(path);
-    const std::string pathString = path.string();
-
-    shaderc::Compiler                   compiler;
-    const shaderc::SpvCompilationResult result = compiler.CompileGlslToSpv(source, shaderKind, pathString.c_str());
-
-    if (result.GetCompilationStatus() != shaderc_compilation_status_success) {
-      throw std::runtime_error("tH7qN4vZpR :: failed to compile shader " + pathString + ": " + result.GetErrorMessage());
-    }
-
-    return {result.cbegin(), result.cend()};
-  }
-
-} // namespace
+import util;
 
 export namespace app {
 
@@ -127,9 +90,9 @@ namespace app::vulkan_pipeline {
                                      VkPipelineLayout &pipelineLayout,
                                      VkPipeline       &graphicsPipeline)
   {
-    const std::filesystem::path shaderPath     = executableBasePath() / "shaders";
-    const std::vector<uint32_t> vertShaderCode = compileShader(shaderPath / "triangle.vert", shaderc_vertex_shader);
-    const std::vector<uint32_t> fragShaderCode = compileShader(shaderPath / "triangle.frag", shaderc_fragment_shader);
+    const std::filesystem::path shaderPath     = util::executableBasePath() / "shaders";
+    const std::vector<uint32_t> vertShaderCode = util::compileShader(shaderPath / "triangle.vert", shaderc_vertex_shader);
+    const std::vector<uint32_t> fragShaderCode = util::compileShader(shaderPath / "triangle.frag", shaderc_fragment_shader);
 
     // Vertex shader module Vulkan.
     const VkShaderModule vertShaderModule = createShaderModule(device, vertShaderCode);

@@ -25,7 +25,7 @@ module;
 
 export module triangle_application_vulkan_init;
 
-import utils;
+import util;
 import cmd_pipeline;
 import cmd_light;
 import vulkanPipeline;

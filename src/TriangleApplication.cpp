@@ -15,7 +15,7 @@ module;
 
 module triangle_application;
 
-import utils;
+import util;
 import getter;
 import settings;
 import cmd;
@@ -251,13 +251,13 @@ namespace app {
         return;
       }
 
-      std::cout << nowStr() << " t17HETHHeE :: Unknown cmd " << typeid(*pointer).name() << std::endl;
+      std::cout << util::nowStr() << " t17HETHHeE :: Unknown cmd " << typeid(*pointer).name() << std::endl;
     }
 
     // ReSharper disable once CppPassValueParameterByConstReference
     static void execute_CmdPrintToConsole(const std::shared_ptr<cmd::CmdPrintToConsole> cmdPtr)
     {
-      std::cout << nowStr() << " " << cmdPtr->message << std::endl;
+      std::cout << util::nowStr() << " " << cmdPtr->message << std::endl;
     }
 
     // ReSharper disable once CppPassValueParameterByConstReference

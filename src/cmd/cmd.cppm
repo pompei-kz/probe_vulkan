@@ -5,7 +5,7 @@ module;
 #include <string>
 
 export module cmd;
-import utils;
+import util;
 
 export namespace cmd {
 
