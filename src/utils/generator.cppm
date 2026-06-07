@@ -128,7 +128,7 @@ export namespace gen {
     }
   }
 
-  void populateWithCylinder(cmd::Mesh *, glm::vec3, glm::vec3, float, float, int, int, bool, bool);
+  void populateWithCylinder(cmd::Mesh *, glm::vec3, glm::vec3, float, float, bool, bool, int, int);
 
   // Радиус, который меньше или равен этому значению, считается нулевым - основание вырождается в вершину (конус).
   constexpr float CYLINDER_RADIUS_EPSILON = 1e-6F;
@@ -148,7 +148,15 @@ export namespace gen {
                             const int   heightSegments)
   {
     const float halfHeight = height * 0.5F;
-    populateWithCylinder(target, glm::vec3{0, 0, -halfHeight}, glm::vec3{0, 0, halfHeight}, radius, radius, radialSegments, heightSegments, false, false);
+    populateWithCylinder(target,
+                         glm::vec3{0, 0, -halfHeight},
+                         glm::vec3{0, 0, halfHeight},
+                         radius,
+                         radius,
+                         false,
+                         false,
+                         heightSegments,
+                         radialSegments);
   }
 
   /**
@@ -165,20 +173,28 @@ export namespace gen {
    * @param center2 center of the second base
    * @param radius1 radius of the base at `center1` (zero means an apex at `center1`)
    * @param radius2 radius of the base at `center2` (zero means an apex at `center2`)
-   * @param radialSegments segment count around the axis
-   * @param heightSegments segment count along the axis
    * @param open1 if true, the base at `center1` is left open (no cap); if false, it is capped
    * @param open2 if true, the base at `center2` is left open (no cap); if false, it is capped
+   * @param heightSegments segment count along the axis
+   * @param radialSegments segment count around the axis
    */
-  void populateWithCylinder(cmd::Mesh  *target,         //
-                            glm::vec3   center1,        //
-                            glm::vec3   center2,        //
-                            const float radius1,        //
-                            const float radius2,        //
-                            const int   radialSegments, //
-                            const int   heightSegments, //
-                            const bool  open1,          //
-                            const bool  open2)
+  void populateWithCylinder(cmd::Mesh *target,
+                            //
+                            glm::vec3 center1,
+                            //
+                            glm::vec3 center2,
+                            //
+                            const float radius1,
+                            //
+                            const float radius2,
+                            //
+                            const bool open1,
+                            //
+                            const bool open2,
+                            //
+                            const int heightSegments,
+                            //
+                            const int radialSegments)
   {
     if (target == nullptr) {
       throw std::invalid_argument("qD2hN7vKsP :: target mesh is null");

@@ -310,7 +310,7 @@ TEST(PopulateWithCylinderFull, ClosedCylinderProducesExpectedCounts)
 
   //
   //
-  gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 5}, radius, radius, radialSegments, heightSegments, open1, open2);
+  gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 5}, radius, radius, open1, open2, heightSegments, radialSegments);
   //
   //
 
@@ -335,9 +335,9 @@ TEST(PopulateWithCylinderFull, OpenFlagsRemoveCaps)
 
   //
   //
-  gen::populateWithCylinder(&bothOpen, c1, c2, 1.0F, 1.0F, radialSegments, heightSegments, true, true);
-  gen::populateWithCylinder(&oneOpen, c1, c2, 1.0F, 1.0F, radialSegments, heightSegments, true, false);
-  gen::populateWithCylinder(&closed, c1, c2, 1.0F, 1.0F, radialSegments, heightSegments, false, false);
+  gen::populateWithCylinder(&bothOpen, c1, c2, 1.0F, 1.0F, true, true, heightSegments, radialSegments);
+  gen::populateWithCylinder(&oneOpen, c1, c2, 1.0F, 1.0F, true, false, heightSegments, radialSegments);
+  gen::populateWithCylinder(&closed, c1, c2, 1.0F, 1.0F, false, false, heightSegments, radialSegments);
   //
   //
 
@@ -366,7 +366,7 @@ TEST(PopulateWithCylinderFull, OpenTubePointsLieOnSideSurface)
 
   //
   //
-  gen::populateWithCylinder(&mesh, c1, c2, radius, radius, 16, 5, true, true);
+  gen::populateWithCylinder(&mesh, c1, c2, radius, radius, true, true, 5, 16);
   //
   //
 
@@ -391,7 +391,7 @@ TEST(PopulateWithCylinderFull, ClosedCapsAddBaseCenters)
 
   //
   //
-  gen::populateWithCylinder(&mesh, c1, c2, 1.5F, 1.5F, 10, 2, false, false);
+  gen::populateWithCylinder(&mesh, c1, c2, 1.5F, 1.5F, false, false, 2, 10);
   //
   //
 
@@ -411,7 +411,7 @@ TEST(PopulateWithCylinderFull, OpenBaseHasNoCenterVertex)
 
   //
   //
-  gen::populateWithCylinder(&mesh, c1, c2, 1.0F, 1.0F, 12, 3, true, false);
+  gen::populateWithCylinder(&mesh, c1, c2, 1.0F, 1.0F, true, false, 3, 12);
   //
   //
 
@@ -429,7 +429,7 @@ TEST(PopulateWithCylinderFull, AllTriangleIndicesAreInRange)
 
   //
   //
-  gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{2, 0, 0}, 1.0F, 1.0F, 9, 4, false, false);
+  gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{2, 0, 0}, 1.0F, 1.0F, false, false, 4, 9);
   //
   //
 
@@ -472,8 +472,8 @@ TEST(PopulateWithCylinderSimple, ClosedAlongOzCenteredAtOrigin)
 TEST(PopulateWithCylinderFull, ReusingMeshClearsPreviousData)
 {
   cmd::Mesh mesh;
-  gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 8}, 1.0F, 1.0F, 20, 6, false, false);
-  gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 2}, 1.0F, 1.0F, 5, 1, true, true);
+  gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 8}, 1.0F, 1.0F, false, false, 6, 20);
+  gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 2}, 1.0F, 1.0F, true, true, 1, 5);
 
   EXPECT_EQ(mesh.points.size(), expectedCylinderPointCount(1.0F, 1.0F, 5, 1, true, true));
   EXPECT_EQ(mesh.triangles.size(), expectedCylinderTriangleCount(1.0F, 1.0F, 5, 1, true, true));
@@ -486,7 +486,7 @@ TEST(PopulateWithCylinderFull, NullTargetThrows)
 {
   //
   //
-  EXPECT_THROW(gen::populateWithCylinder(nullptr, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, 1.0F, 1.0F, 8, 2, false, false), std::invalid_argument);
+  EXPECT_THROW(gen::populateWithCylinder(nullptr, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, 1.0F, 1.0F, false, false, 2, 8), std::invalid_argument);
   //
   //
 }
@@ -497,8 +497,8 @@ TEST(PopulateWithCylinderFull, NegativeRadiusThrows)
 
   //
   //
-  EXPECT_THROW(gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, -1.0F, 1.0F, 8, 2, false, false), std::invalid_argument);
-  EXPECT_THROW(gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, 1.0F, -1.0F, 8, 2, false, false), std::invalid_argument);
+  EXPECT_THROW(gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, -1.0F, 1.0F, false, false, 2, 8), std::invalid_argument);
+  EXPECT_THROW(gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, 1.0F, -1.0F, false, false, 2, 8), std::invalid_argument);
   //
   //
 }
@@ -509,7 +509,7 @@ TEST(PopulateWithCylinderFull, BothRadiiZeroThrows)
 
   //
   //
-  EXPECT_THROW(gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, 0.0F, 0.0F, 8, 2, false, false), std::invalid_argument);
+  EXPECT_THROW(gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, 0.0F, 0.0F, false, false, 2, 8), std::invalid_argument);
   //
   //
 }
@@ -520,7 +520,7 @@ TEST(PopulateWithCylinderFull, TooFewRadialSegmentsThrows)
 
   //
   //
-  EXPECT_THROW(gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, 1.0F, 1.0F, 2, 2, false, false), std::invalid_argument);
+  EXPECT_THROW(gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, 1.0F, 1.0F, false, false, 2, 2), std::invalid_argument);
   //
   //
 }
@@ -531,7 +531,7 @@ TEST(PopulateWithCylinderFull, TooFewHeightSegmentsThrows)
 
   //
   //
-  EXPECT_THROW(gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, 1.0F, 1.0F, 8, 0, false, false), std::invalid_argument);
+  EXPECT_THROW(gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, 1.0F, 1.0F, false, false, 0, 8), std::invalid_argument);
   //
   //
 }
@@ -542,7 +542,7 @@ TEST(PopulateWithCylinderFull, EqualBaseCentersThrow)
 
   //
   //
-  EXPECT_THROW(gen::populateWithCylinder(&mesh, glm::vec3{1, 2, 3}, glm::vec3{1, 2, 3}, 1.0F, 1.0F, 8, 2, false, false), std::invalid_argument);
+  EXPECT_THROW(gen::populateWithCylinder(&mesh, glm::vec3{1, 2, 3}, glm::vec3{1, 2, 3}, 1.0F, 1.0F, false, false, 2, 8), std::invalid_argument);
   //
   //
 }
@@ -566,7 +566,7 @@ TEST(PopulateWithCylinderCone, ZeroRadius1ProducesApexCounts)
 
   //
   //
-  gen::populateWithCylinder(&mesh, c1, c2, 0.0F, 2.0F, radialSegments, heightSegments, false, false);
+  gen::populateWithCylinder(&mesh, c1, c2, 0.0F, 2.0F, false, false, heightSegments, radialSegments);
   //
   //
 
@@ -591,8 +591,8 @@ TEST(PopulateWithCylinderCone, ApexEndIgnoresOpenFlag)
 
   //
   //
-  gen::populateWithCylinder(&apexClosed, c1, c2, 0.0F, 2.0F, 10, 2, false, false);
-  gen::populateWithCylinder(&apexOpen, c1, c2, 0.0F, 2.0F, 10, 2, true, false);
+  gen::populateWithCylinder(&apexClosed, c1, c2, 0.0F, 2.0F, false, false, 2, 10);
+  gen::populateWithCylinder(&apexOpen, c1, c2, 0.0F, 2.0F, true, false, 2, 10);
   //
   //
 
@@ -609,7 +609,7 @@ TEST(PopulateWithCylinderCone, NoDegenerateTrianglesAndIndicesInRange)
 
   //
   //
-  gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 3}, 2.0F, 0.0F, 9, 4, false, false);
+  gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 3}, 2.0F, 0.0F, false, false, 4, 9);
   //
   //
 
@@ -642,7 +642,7 @@ TEST(PopulateWithCylinderCone, NearZeroRadiusIsApex)
 
   //
   //
-  gen::populateWithCylinder(&mesh, c1, c2, 1e-7F, 1.0F, radialSegments, heightSegments, false, false);
+  gen::populateWithCylinder(&mesh, c1, c2, 1e-7F, 1.0F, false, false, heightSegments, radialSegments);
   //
   //
 
