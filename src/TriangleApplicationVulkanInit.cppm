@@ -70,6 +70,24 @@ namespace app {
     std::vector<VkPresentModeKHR> presentModes;
   };
 
+  export struct VulkanPipelineDescriptors
+  {
+    // Layout графического pipeline Vulkan.
+    VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
+    // Графический pipeline Vulkan.
+    VkPipeline graphicsPipeline     = VK_NULL_HANDLE;
+    // Vertex buffer Vulkan.
+    VkBuffer vertexBuffer           = VK_NULL_HANDLE;
+    // Память Vulkan для vertex buffer.
+    VkDeviceMemory vertexBufferMemory = VK_NULL_HANDLE;
+    // Index buffer Vulkan.
+    VkBuffer indexBuffer              = VK_NULL_HANDLE;
+    // Память Vulkan для index buffer.
+    VkDeviceMemory indexBufferMemory  = VK_NULL_HANDLE;
+    std::vector<Vertex>   vertices;
+    std::vector<uint32_t> indices;
+  };
+
   export class VulkanInit
   {
   public:
@@ -80,9 +98,16 @@ namespace app {
     void setCameraPlanes(float nearPlane, float farPlane);
     void setCameraFovDegrees(float fovDegrees);
     void setSunLight(glm::vec3 direction, glm::vec3 color, float force);
+    void setPipelineDescriptors(const std::vector<VulkanPipelineDescriptors *> &pipelineDescriptors);
+    void createPipelineDescriptors(VulkanPipelineDescriptors &pipelineDescriptors) const;
+    void destroyPipelineDescriptors(VulkanPipelineDescriptors &pipelineDescriptors) const;
     void setShapeGroupData(const std::vector<cmd::Mesh>     &meshes,
                            const std::vector<cmd::Material> &materials,
                            const std::vector<cmd::Shape>    &shapes);
+    void setShapeGroupData(VulkanPipelineDescriptors         &pipelineDescriptors,
+                           const std::vector<cmd::Mesh>     &meshes,
+                           const std::vector<cmd::Material> &materials,
+                           const std::vector<cmd::Shape>    &shapes) const;
     void waitIdle() const;
     void cleanup();
     void drawFrame(bool &framebufferResized);
@@ -148,6 +173,7 @@ namespace app {
     VkDeviceMemory indexBufferMemory_  = VK_NULL_HANDLE;
     std::vector<Vertex>   vertices_{vulkan_pipeline::defaultVertices()};
     std::vector<uint32_t> indices_{vulkan_pipeline::defaultIndices()};
+    std::vector<VulkanPipelineDescriptors *> pipelineDescriptors_;
 
     // Пул командных буферов Vulkan.
     VkCommandPool commandPool_ = VK_NULL_HANDLE;
@@ -191,6 +217,12 @@ namespace app {
     void uploadBufferData(const VkDeviceMemory bufferMemory, const void *source, const VkDeviceSize size) const;
     void destroyGeometryBuffers();
     void recreateGeometryBuffers();
+    void createPipelineGraphicsObjects(VulkanPipelineDescriptors &pipelineDescriptors) const;
+    void destroyPipelineGraphicsObjects(VulkanPipelineDescriptors &pipelineDescriptors) const;
+    void destroyPipelineGeometryBuffers(VulkanPipelineDescriptors &pipelineDescriptors) const;
+    void recreatePipelineGeometryBuffers(VulkanPipelineDescriptors &pipelineDescriptors) const;
+    void createPipelineVertexBuffer(VulkanPipelineDescriptors &pipelineDescriptors) const;
+    void createPipelineIndexBuffer(VulkanPipelineDescriptors &pipelineDescriptors) const;
     void recordCommandBuffer(const VkCommandBuffer commandBuffer, const uint32_t imageIndex) const;
     void recreateSwapChain();
     void cleanupSwapChain();
@@ -260,6 +292,28 @@ namespace app {
     vulkan_pipeline::setSunLight(pushConstants_, direction, color, force);
   }
 
+  void VulkanInit::setPipelineDescriptors(const std::vector<VulkanPipelineDescriptors *> &pipelineDescriptors)
+  {
+    pipelineDescriptors_ = pipelineDescriptors;
+  }
+
+  void VulkanInit::createPipelineDescriptors(VulkanPipelineDescriptors &pipelineDescriptors) const
+  {
+    createPipelineGraphicsObjects(pipelineDescriptors);
+    recreatePipelineGeometryBuffers(pipelineDescriptors);
+  }
+
+  void VulkanInit::destroyPipelineDescriptors(VulkanPipelineDescriptors &pipelineDescriptors) const
+  {
+    if (device_ == VK_NULL_HANDLE) return;
+
+    vkDeviceWaitIdle(device_);
+    destroyPipelineGeometryBuffers(pipelineDescriptors);
+    destroyPipelineGraphicsObjects(pipelineDescriptors);
+    pipelineDescriptors.vertices.clear();
+    pipelineDescriptors.indices.clear();
+  }
+
   void VulkanInit::setShapeGroupData(const std::vector<cmd::Mesh>     &meshes,
                                      const std::vector<cmd::Material> &materials,
                                      const std::vector<cmd::Shape>    &shapes)
@@ -268,6 +322,17 @@ namespace app {
     vertices_             = std::move(geometry.vertices);
     indices_              = std::move(geometry.indices);
     recreateGeometryBuffers();
+  }
+
+  void VulkanInit::setShapeGroupData(VulkanPipelineDescriptors         &pipelineDescriptors,
+                                     const std::vector<cmd::Mesh>     &meshes,
+                                     const std::vector<cmd::Material> &materials,
+                                     const std::vector<cmd::Shape>    &shapes) const
+  {
+    GeometryData geometry        = vulkan_pipeline::buildShapeGroupGeometry(meshes, materials, shapes);
+    pipelineDescriptors.vertices = std::move(geometry.vertices);
+    pipelineDescriptors.indices  = std::move(geometry.indices);
+    recreatePipelineGeometryBuffers(pipelineDescriptors);
   }
 
   void VulkanInit::createInstance()
@@ -814,6 +879,84 @@ namespace app {
     createIndexBuffer();
   }
 
+  void VulkanInit::createPipelineGraphicsObjects(VulkanPipelineDescriptors &pipelineDescriptors) const
+  {
+    if (device_ == VK_NULL_HANDLE || renderPass_ == VK_NULL_HANDLE) return;
+
+    vulkan_pipeline::createGraphicsPipeline(device_,
+                                            swapChainExtent_,
+                                            renderPass_,
+                                            pipelineDescriptors.pipelineLayout,
+                                            pipelineDescriptors.graphicsPipeline);
+  }
+
+  void VulkanInit::destroyPipelineGraphicsObjects(VulkanPipelineDescriptors &pipelineDescriptors) const
+  {
+    if (pipelineDescriptors.graphicsPipeline != VK_NULL_HANDLE) {
+      vkDestroyPipeline(device_, pipelineDescriptors.graphicsPipeline, nullptr);
+      pipelineDescriptors.graphicsPipeline = VK_NULL_HANDLE;
+    }
+    if (pipelineDescriptors.pipelineLayout != VK_NULL_HANDLE) {
+      vkDestroyPipelineLayout(device_, pipelineDescriptors.pipelineLayout, nullptr);
+      pipelineDescriptors.pipelineLayout = VK_NULL_HANDLE;
+    }
+  }
+
+  void VulkanInit::destroyPipelineGeometryBuffers(VulkanPipelineDescriptors &pipelineDescriptors) const
+  {
+    if (pipelineDescriptors.indexBuffer != VK_NULL_HANDLE) {
+      vkDestroyBuffer(device_, pipelineDescriptors.indexBuffer, nullptr);
+      pipelineDescriptors.indexBuffer = VK_NULL_HANDLE;
+    }
+    if (pipelineDescriptors.indexBufferMemory != VK_NULL_HANDLE) {
+      vkFreeMemory(device_, pipelineDescriptors.indexBufferMemory, nullptr);
+      pipelineDescriptors.indexBufferMemory = VK_NULL_HANDLE;
+    }
+    if (pipelineDescriptors.vertexBuffer != VK_NULL_HANDLE) {
+      vkDestroyBuffer(device_, pipelineDescriptors.vertexBuffer, nullptr);
+      pipelineDescriptors.vertexBuffer = VK_NULL_HANDLE;
+    }
+    if (pipelineDescriptors.vertexBufferMemory != VK_NULL_HANDLE) {
+      vkFreeMemory(device_, pipelineDescriptors.vertexBufferMemory, nullptr);
+      pipelineDescriptors.vertexBufferMemory = VK_NULL_HANDLE;
+    }
+  }
+
+  void VulkanInit::recreatePipelineGeometryBuffers(VulkanPipelineDescriptors &pipelineDescriptors) const
+  {
+    if (device_ == VK_NULL_HANDLE) return;
+    vkDeviceWaitIdle(device_);
+    destroyPipelineGeometryBuffers(pipelineDescriptors);
+    createPipelineVertexBuffer(pipelineDescriptors);
+    createPipelineIndexBuffer(pipelineDescriptors);
+  }
+
+  void VulkanInit::createPipelineVertexBuffer(VulkanPipelineDescriptors &pipelineDescriptors) const
+  {
+    if (pipelineDescriptors.vertices.empty()) return;
+
+    const VkDeviceSize bufferSize = sizeof(pipelineDescriptors.vertices[0]) * pipelineDescriptors.vertices.size();
+    createBuffer(bufferSize,
+                 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 pipelineDescriptors.vertexBuffer,
+                 pipelineDescriptors.vertexBufferMemory);
+    uploadBufferData(pipelineDescriptors.vertexBufferMemory, pipelineDescriptors.vertices.data(), bufferSize);
+  }
+
+  void VulkanInit::createPipelineIndexBuffer(VulkanPipelineDescriptors &pipelineDescriptors) const
+  {
+    if (pipelineDescriptors.indices.empty()) return;
+
+    const VkDeviceSize bufferSize = sizeof(pipelineDescriptors.indices[0]) * pipelineDescriptors.indices.size();
+    createBuffer(bufferSize,
+                 VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 pipelineDescriptors.indexBuffer,
+                 pipelineDescriptors.indexBufferMemory);
+    uploadBufferData(pipelineDescriptors.indexBufferMemory, pipelineDescriptors.indices.data(), bufferSize);
+  }
+
   void VulkanInit::createVertexBuffer()
   {
     if (vertices_.empty()) return;
@@ -859,16 +1002,34 @@ namespace app {
 
   void VulkanInit::recordCommandBuffer(const VkCommandBuffer commandBuffer, const uint32_t imageIndex) const
   {
+    std::vector<PipelineDrawData> pipelineDraws;
+    pipelineDraws.reserve(1 + pipelineDescriptors_.size());
+    pipelineDraws.push_back(PipelineDrawData{
+        .graphicsPipeline = graphicsPipeline_,
+        .vertexBuffer     = vertexBuffer_,
+        .indexBuffer      = indexBuffer_,
+        .indices          = &indices_,
+        .pipelineLayout   = pipelineLayout_,
+    });
+
+    for (const VulkanPipelineDescriptors *pipelineDescriptors : pipelineDescriptors_) {
+      if (pipelineDescriptors == nullptr) continue;
+
+      pipelineDraws.push_back(PipelineDrawData{
+          .graphicsPipeline = pipelineDescriptors->graphicsPipeline,
+          .vertexBuffer     = pipelineDescriptors->vertexBuffer,
+          .indexBuffer      = pipelineDescriptors->indexBuffer,
+          .indices          = &pipelineDescriptors->indices,
+          .pipelineLayout   = pipelineDescriptors->pipelineLayout,
+      });
+    }
+
     vulkan_pipeline::recordCommandBuffer(commandBuffer,
                                          imageIndex,
                                          renderPass_,
                                          swapChainFramebuffers_,
                                          swapChainExtent_,
-                                         graphicsPipeline_,
-                                         vertexBuffer_,
-                                         indexBuffer_,
-                                         indices_,
-                                         pipelineLayout_,
+                                         pipelineDraws,
                                          pushConstants_);
   }
 
@@ -926,6 +1087,11 @@ namespace app {
     }
 
     destroyGeometryBuffers();
+    for (VulkanPipelineDescriptors *pipelineDescriptors : pipelineDescriptors_) {
+      if (pipelineDescriptors == nullptr) continue;
+      destroyPipelineGeometryBuffers(*pipelineDescriptors);
+    }
+    pipelineDescriptors_.clear();
 
     // Уничтожаем пул команд Vulkan.
     vkDestroyCommandPool(device_, commandPool_, nullptr);
@@ -1025,6 +1191,10 @@ namespace app {
     createImageViews();
     createRenderPass();
     createGraphicsPipeline();
+    for (VulkanPipelineDescriptors *pipelineDescriptors : pipelineDescriptors_) {
+      if (pipelineDescriptors == nullptr) continue;
+      createPipelineGraphicsObjects(*pipelineDescriptors);
+    }
     createFramebuffers();
   }
 
@@ -1043,6 +1213,11 @@ namespace app {
     // Уничтожаем layout pipeline Vulkan.
     vkDestroyPipelineLayout(device_, pipelineLayout_, nullptr);
     pipelineLayout_ = VK_NULL_HANDLE;
+
+    for (VulkanPipelineDescriptors *pipelineDescriptors : pipelineDescriptors_) {
+      if (pipelineDescriptors == nullptr) continue;
+      destroyPipelineGraphicsObjects(*pipelineDescriptors);
+    }
 
     // Уничтожаем render pass Vulkan.
     vkDestroyRenderPass(device_, renderPass_, nullptr);

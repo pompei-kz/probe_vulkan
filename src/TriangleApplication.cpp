@@ -34,16 +34,17 @@ namespace app {
   struct PipelineVk
   {
     virtual ~PipelineVk() = default;
+
+    VulkanPipelineDescriptors descriptors;
   };
 
   struct PipelineVk_ShapeGroup : PipelineVk
   {
-    std::vector<cmd::Mesh>     meshes;
-    std::vector<cmd::Material> materials;
-
-    std::function<size_t()>                         shapeCountFn;
+    std::vector<cmd::Mesh>                         meshes;
+    std::vector<cmd::Material>                     materials;
+    std::function<size_t()>                        shapeCountFn;
     std::function<void(std::vector<cmd::Shape> &)> populateShapesFn;
-    std::vector<cmd::Shape>                         shapes;
+    std::vector<cmd::Shape>                        shapes;
   };
 
   struct LightVk
@@ -194,9 +195,8 @@ namespace app {
 
     void uploadPipelineRuntimeData()
     {
-      std::vector<cmd::Mesh>     meshes;
-      std::vector<cmd::Material> materials;
-      std::vector<cmd::Shape>    shapes;
+      std::vector<VulkanPipelineDescriptors *> pipelineDescriptors;
+      pipelineDescriptors.reserve(pipeline_ids_.size());
 
       for (const std::string &pipelineId : pipeline_ids_) {
         const auto pipelineIter = pipeline_map_.find(pipelineId);
@@ -205,21 +205,11 @@ namespace app {
         auto *shapeGroup = dynamic_cast<PipelineVk_ShapeGroup *>(pipelineIter->second.get());
         if (shapeGroup == nullptr) continue;
 
-        const uint32_t meshOffset     = static_cast<uint32_t>(meshes.size());
-        const uint32_t materialOffset = static_cast<uint32_t>(materials.size());
-        meshes.insert(meshes.end(), shapeGroup->meshes.begin(), shapeGroup->meshes.end());
-        materials.insert(materials.end(), shapeGroup->materials.begin(), shapeGroup->materials.end());
-
-        for (cmd::Shape shape : shapeGroup->shapes) {
-          shape.meshIndex     += meshOffset;
-          shape.materialIndex += materialOffset;
-          shapes.push_back(shape);
-        }
+        vulkan_.setShapeGroupData(shapeGroup->descriptors, shapeGroup->meshes, shapeGroup->materials, shapeGroup->shapes);
+        pipelineDescriptors.push_back(&shapeGroup->descriptors);
       }
 
-      if (!shapes.empty()) {
-        vulkan_.setShapeGroupData(meshes, materials, shapes);
-      }
+      vulkan_.setPipelineDescriptors(pipelineDescriptors);
     }
 
     // ReSharper disable once CppPassValueParameterByConstReference
@@ -273,13 +263,19 @@ namespace app {
         throw std::invalid_argument("yQ5nC8vLrB :: pipeline id must not be empty");
       }
 
-      const bool isNewPipeline = !pipeline_map_.contains(cmdPtr->id);
+      const auto existingPipelineIter = pipeline_map_.find(cmdPtr->id);
+      const bool isNewPipeline        = existingPipelineIter == pipeline_map_.end();
 
       auto pipeline              = std::make_unique<PipelineVk_ShapeGroup>();
       pipeline->meshes           = cmdPtr->meshes;
       pipeline->materials        = cmdPtr->materials;
       pipeline->shapeCountFn     = cmdPtr->shapeCountFn;
       pipeline->populateShapesFn = cmdPtr->populateShapesFn;
+      vulkan_.createPipelineDescriptors(pipeline->descriptors);
+
+      if (!isNewPipeline) {
+        vulkan_.destroyPipelineDescriptors(existingPipelineIter->second->descriptors);
+      }
 
       pipeline_map_[cmdPtr->id] = std::move(pipeline);
 
@@ -304,7 +300,7 @@ namespace app {
       vulkan_.setSunLight(sun->direction, sun->color, sun->force);
 
       std::unique_ptr<LightVk> light = std::move(sun);
-      light_map_[cmdPtr->id]        = std::move(light);
+      light_map_[cmdPtr->id]         = std::move(light);
 
       if (isNewLight) {
         light_ids_.push_back(cmdPtr->id);

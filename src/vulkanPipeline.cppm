@@ -72,6 +72,15 @@ export namespace app {
     std::vector<uint32_t> indices;
   };
 
+  struct PipelineDrawData
+  {
+    VkPipeline                  graphicsPipeline = VK_NULL_HANDLE;
+    VkBuffer                    vertexBuffer     = VK_NULL_HANDLE;
+    VkBuffer                    indexBuffer      = VK_NULL_HANDLE;
+    const std::vector<uint32_t> *indices         = nullptr;
+    VkPipelineLayout            pipelineLayout   = VK_NULL_HANDLE;
+  };
+
 } // namespace app
 
 namespace app::vulkan_pipeline {
@@ -168,17 +177,46 @@ namespace app::vulkan_pipeline {
     return result;
   }
 
-  export void recordCommandBuffer(const VkCommandBuffer            commandBuffer,
-                                  const uint32_t                   imageIndex,
-                                  const VkRenderPass               renderPass,
-                                  const std::vector<VkFramebuffer> &swapChainFramebuffers,
-                                  const VkExtent2D                 swapChainExtent,
-                                  const VkPipeline                 graphicsPipeline,
-                                  const VkBuffer                   vertexBuffer,
-                                  const VkBuffer                   indexBuffer,
-                                  const std::vector<uint32_t>      &indices,
-                                  const VkPipelineLayout           pipelineLayout,
-                                  const PushConstants              &pushConstants)
+  void recordPipelineDraw(const VkCommandBuffer commandBuffer, const PipelineDrawData &pipelineDraw, const PushConstants &pushConstants)
+  {
+    if (pipelineDraw.graphicsPipeline == VK_NULL_HANDLE || pipelineDraw.pipelineLayout == VK_NULL_HANDLE) {
+      return;
+    }
+
+    // Привязываем графический pipeline Vulkan.
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineDraw.graphicsPipeline);
+
+    if (pipelineDraw.vertexBuffer == VK_NULL_HANDLE || pipelineDraw.indexBuffer == VK_NULL_HANDLE || pipelineDraw.indices == nullptr ||
+        pipelineDraw.indices->empty()) {
+      return;
+    }
+
+    // Vertex buffer Vulkan для привязки к pipeline.
+    const VkBuffer vertexBuffers[]   = {pipelineDraw.vertexBuffer};
+    // Смещения vertex buffer Vulkan.
+    constexpr VkDeviceSize offsets[] = {0};
+    // Привязываем vertex buffer Vulkan.
+    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+    // Привязываем index buffer Vulkan.
+    vkCmdBindIndexBuffer(commandBuffer, pipelineDraw.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+    // Передаем матрицы трансформации в push constants Vulkan.
+    vkCmdPushConstants(commandBuffer,
+                       pipelineDraw.pipelineLayout,
+                       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                       0,
+                       sizeof(PushConstants),
+                       &pushConstants);
+    // Отправляем индексированную команду рисования Vulkan.
+    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(pipelineDraw.indices->size()), 1, 0, 0, 0);
+  }
+
+  export void recordCommandBuffer(const VkCommandBuffer              commandBuffer,
+                                  const uint32_t                     imageIndex,
+                                  const VkRenderPass                 renderPass,
+                                  const std::vector<VkFramebuffer>   &swapChainFramebuffers,
+                                  const VkExtent2D                   swapChainExtent,
+                                  const std::vector<PipelineDrawData> &pipelineDraws,
+                                  const PushConstants                &pushConstants)
   {
     // Параметры начала записи command buffer Vulkan.
     VkCommandBufferBeginInfo beginInfo{};
@@ -204,34 +242,11 @@ namespace app::vulkan_pipeline {
 
     // Начинаем render pass Vulkan.
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-    // Привязываем графический pipeline Vulkan.
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
-    if (vertexBuffer == VK_NULL_HANDLE || indexBuffer == VK_NULL_HANDLE || indices.empty()) {
-      vkCmdEndRenderPass(commandBuffer);
-      if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
-        throw std::runtime_error("wJ4tK6mPxV :: failed to record command buffer");
-      }
-      return;
+    for (const PipelineDrawData &pipelineDraw : pipelineDraws) {
+      recordPipelineDraw(commandBuffer, pipelineDraw, pushConstants);
     }
 
-    // Vertex buffer Vulkan для привязки к pipeline.
-    const VkBuffer vertexBuffers[]   = {vertexBuffer};
-    // Смещения vertex buffer Vulkan.
-    constexpr VkDeviceSize offsets[] = {0};
-    // Привязываем vertex buffer Vulkan.
-    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-    // Привязываем index buffer Vulkan.
-    vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-    // Передаем матрицы трансформации в push constants Vulkan.
-    vkCmdPushConstants(commandBuffer,
-                       pipelineLayout,
-                       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                       0,
-                       sizeof(PushConstants),
-                       &pushConstants);
-    // Отправляем индексированную команду рисования Vulkan.
-    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
     // Завершаем render pass Vulkan.
     vkCmdEndRenderPass(commandBuffer);
 
