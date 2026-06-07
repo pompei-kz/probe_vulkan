@@ -109,10 +109,32 @@ export namespace cmd {
     std::vector<Material> materials;
 
     /**
-     * Each frame system calls this function and draw shapes.
+     * Called once per frame to determine the number of shapes.
      *
-     * Size of this vector may be changed, but it is a rare event.
+     * If the returned value matches the result of the previous call,
+     * the existing shape vector and shape buffers are reused.
+     *
+     * If the value differs, the system reallocates the shape vector and
+     * resizes the shape buffers to match the new shape count.
      */
-    std::function<std::shared_ptr<std::vector<Shape>>()> shapesFn;
+    std::function<size_t()> shapeCountFn;
+
+    /**
+     * Called once per frame to generate shapes for rendering.
+     *
+     * The system maintains a std::vector<Shape> whose size is determined by
+     * `this->shapeCountFn`.
+     *
+     * If the shape count has not changed since the previous frame, the same
+     * vector instance is reused and still contains the shape data written
+     * during the previous frame.
+     *
+     * If the shape count changes, the vector is reallocated to match the new
+     * shape count.
+     *
+     * The implementation should update the vector contents as needed.
+     * After that, all shapes in the vector will be rendered on the screen.
+     */
+    std::function<void(std::vector<Shape> &)> populateShapesFn;
   };
 } // namespace cmd
