@@ -11,6 +11,7 @@ module;
 #include <vulkan/vulkan.h>
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cstring>
 #include <limits>
@@ -32,29 +33,13 @@ namespace app {
   constexpr int WINDOW_HEIGHT = 600;
 
   // Количество кадров, которые CPU может подготавливать одновременно.
-  // Значение 2 дает двойную буферизацию синхронизации: один кадр отображается или ожидает GPU,
-  // пока следующий уже записывает команды без лишней блокировки CPU.
-  constexpr int MAX_FRAMES_IN_FLIGHT = 2;
+  constexpr int MAX_FRAMES_IN_FLIGHT = model::MAX_FRAMES_IN_FLIGHT;
 
   // ReSharper disable once CppTemplateArgumentsCanBeDeduced
   // ReSharper disable once CppVariableCanBeMadeConstexpr
   const std::vector<const char *> kDeviceExtensions = {
       VK_KHR_SWAPCHAIN_EXTENSION_NAME,
   };
-
-  std::vector<model::Vertex> defaultVertices()
-  {
-    return {
-        model::Vertex{{0.0F, -0.5F, 0.0F}, {0.0F, 0.0F, 1.0F}, {0.0F, 0.25F, 1.0F}},
-        model::Vertex{{0.5F, 0.5F, 0.0F}, {0.0F, 0.0F, 1.0F}, {0.0F, 0.25F, 1.0F}},
-        model::Vertex{{-0.5F, 0.5F, 0.0F}, {0.0F, 0.0F, 1.0F}, {0.0F, 0.25F, 1.0F}},
-    };
-  }
-
-  std::vector<uint32_t> defaultIndices()
-  {
-    return {0, 1, 2};
-  }
 
   export class VulkanInit
   {
@@ -65,18 +50,18 @@ namespace app {
     void setCameraUp(glm::vec3 up);
     void setCameraPlanes(float nearPlane, float farPlane);
     void setCameraFovDegrees(float fovDegrees);
-    void setSunLight(glm::vec3 direction, glm::vec3 color, float force);
-    void setPipelineDescriptors(const std::vector<model::VulkanPipelineDescriptors *> &pipelineDescriptors);
-    void createPipelineDescriptors(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
-    void destroyPipelineDescriptors(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
-    void setShapeGroupData(const std::vector<cmd::Mesh> &meshes, const std::vector<cmd::Material> &materials, const std::vector<cmd::Shape> &shapes);
-    void setShapeGroupData(model::VulkanPipelineDescriptors &pipelineDescriptors,
-                           const std::vector<cmd::Mesh>     &meshes,
-                           const std::vector<cmd::Material> &materials,
-                           const std::vector<cmd::Shape>    &shapes) const;
+
+    // Загружает новый набор источников света. Данные будут переписаны во все слоты кольца.
+    void setLights(std::vector<model::LightGpu> lights);
+
+    // Создает все статические Vulkan ресурсы pipeline (один раз при регистрации).
+    void createPipeline(model::PipelineVk_ShapeGroup &pipeline);
+    // Уничтожает все Vulkan ресурсы pipeline (при удалении или замене).
+    void destroyPipeline(model::PipelineVk_ShapeGroup &pipeline) const;
+
     void waitIdle() const;
     void cleanup();
-    void drawFrame(bool &framebufferResized);
+    void drawFrame(const std::vector<model::PipelineVk_ShapeGroup *> &pipelines, bool &framebufferResized);
     void createInstance();
     void createSurface();
     void pickPhysicalDevice();
@@ -84,11 +69,11 @@ namespace app {
     void createSwapChain();
     void createImageViews();
     void createRenderPass();
-    void createGraphicsPipeline();
+    void createDescriptorSetLayouts();
+    void createSharedPipeline();
     void createFramebuffers();
     void createCommandPool();
-    void createVertexBuffer();
-    void createIndexBuffer();
+    void createLightResources();
     void createCommandBuffers();
     void createSyncObjects();
 
@@ -123,23 +108,23 @@ namespace app {
     std::vector<VkFramebuffer> swapChainFramebuffers_;
 
     // Render pass Vulkan для отрисовки кадра.
-    VkRenderPass renderPass_         = VK_NULL_HANDLE;
-    // Layout графического pipeline Vulkan.
-    VkPipelineLayout pipelineLayout_ = VK_NULL_HANDLE;
-    // Графический pipeline Vulkan.
-    VkPipeline graphicsPipeline_     = VK_NULL_HANDLE;
+    VkRenderPass renderPass_ = VK_NULL_HANDLE;
 
-    // Vertex buffer Vulkan с позициями треугольника.
-    VkBuffer vertexBuffer_                                             = VK_NULL_HANDLE;
-    // Память Vulkan для vertex buffer.
-    VkDeviceMemory vertexBufferMemory_                                 = VK_NULL_HANDLE;
-    // Index buffer Vulkan с индексами треугольника.
-    VkBuffer indexBuffer_                                              = VK_NULL_HANDLE;
-    // Память Vulkan для index buffer.
-    VkDeviceMemory                                  indexBufferMemory_ = VK_NULL_HANDLE;
-    std::vector<model::Vertex>                      vertices_{defaultVertices()};
-    std::vector<uint32_t>                           indices_{defaultIndices()};
-    std::vector<model::VulkanPipelineDescriptors *> pipelineDescriptors_;
+    // Общие descriptor set layouts (живут все время работы устройства).
+    VkDescriptorSetLayout globalSetLayout_   = VK_NULL_HANDLE; // set 0: свет
+    VkDescriptorSetLayout materialSetLayout_ = VK_NULL_HANDLE; // set 1: материалы
+
+    // Общий графический pipeline (одинаковые шейдеры и формат вершин для всех pipeline).
+    VkPipelineLayout sharedPipelineLayout_ = VK_NULL_HANDLE;
+    VkPipeline       sharedPipeline_       = VK_NULL_HANDLE;
+
+    // Ресурсы света: пул, по одному descriptor set и буферу на кадр в полете.
+    VkDescriptorPool                                  lightPool_ = VK_NULL_HANDLE;
+    std::array<VkDescriptorSet, MAX_FRAMES_IN_FLIGHT> lightSets_{};
+    std::array<model::RingSlot, MAX_FRAMES_IN_FLIGHT> lightRing_{};
+    std::vector<model::LightGpu>                      lightData_;
+    glm::vec4                                         lightAmbient_{0.18F, 0.18F, 0.18F, 0.0F};
+    int                                               lightUploadsRemaining_ = 0;
 
     // Пул командных буферов Vulkan.
     VkCommandPool commandPool_ = VK_NULL_HANDLE;
@@ -174,20 +159,19 @@ namespace app {
     static VkPresentModeKHR   chooseSwapPresentMode(const std::vector<VkPresentModeKHR> &presentModes);
     [[nodiscard]] VkExtent2D  chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities) const;
     void                      updateTransformMatrices();
-    [[nodiscard]] uint32_t    findMemoryType(const uint32_t typeFilter, const VkMemoryPropertyFlags properties) const;
-    void                      createBuffer(const VkDeviceSize          size,
-                                           const VkBufferUsageFlags    usage,
-                                           const VkMemoryPropertyFlags properties,
-                                           VkBuffer                   &buffer,
-                                           VkDeviceMemory             &bufferMemory) const;
-    void                      uploadBufferData(const VkDeviceMemory bufferMemory, const void *source, const VkDeviceSize size) const;
-    void                      destroyGeometryBuffers();
-    void                      recreateGeometryBuffers();
-    void                      createPipelineGraphicsObjects(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
-    void                      destroyPipelineGraphicsObjects(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
-    void                      recordCommandBuffer(const VkCommandBuffer commandBuffer, const uint32_t imageIndex) const;
-    void                      recreateSwapChain();
-    void                      cleanupSwapChain();
+
+    void createRingSlot(model::RingSlot &slot, VkDeviceSize size, VkBufferUsageFlags usage, uint32_t capacity) const;
+    void destroyRingSlot(model::RingSlot &slot) const;
+    void createMaterialBuffer(model::PipelineVk_ShapeGroup &pipeline) const;
+    void createPipelineDescriptorSet(model::PipelineVk_ShapeGroup &pipeline) const;
+    void updateLightDescriptor(uint32_t frame) const;
+    void writeLightSlot(uint32_t frame);
+    void ensureInstanceCapacity(model::PipelineVk_ShapeGroup &pipeline, uint32_t frame, uint32_t count) const;
+    void updateInstanceData(model::PipelineVk_ShapeGroup &pipeline, uint32_t frame) const;
+
+    void recordCommandBuffer(const VkCommandBuffer commandBuffer, const uint32_t imageIndex, const std::vector<model::PipelineRenderData> &renderDatas) const;
+    void recreateSwapChain();
+    void cleanupSwapChain();
   };
 
 } // namespace app
@@ -249,49 +233,224 @@ namespace app {
     updateTransformMatrices();
   }
 
-  void VulkanInit::setSunLight(const glm::vec3 direction, const glm::vec3 color, const float force)
+  void VulkanInit::setLights(std::vector<model::LightGpu> lights)
   {
-    vulkan_pipeline::setSunLight(pushConstants_, direction, color, force);
+    lightData_             = std::move(lights);
+    // Перезаписать данные нужно во всех слотах кольца, поэтому помечаем все кадры.
+    lightUploadsRemaining_ = MAX_FRAMES_IN_FLIGHT;
   }
 
-  void VulkanInit::setPipelineDescriptors(const std::vector<model::VulkanPipelineDescriptors *> &pipelineDescriptors)
+  void VulkanInit::createRingSlot(model::RingSlot &slot, const VkDeviceSize size, const VkBufferUsageFlags usage, const uint32_t capacity) const
   {
-    pipelineDescriptors_ = pipelineDescriptors;
+    vulkan_pipeline::createBuffer(device_,
+                                  physicalDevice_,
+                                  size,
+                                  usage,
+                                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                  slot.buffer,
+                                  slot.memory);
+    if (vkMapMemory(device_, slot.memory, 0, size, 0, &slot.mapped) != VK_SUCCESS) {
+      throw std::runtime_error("xR4nT9mLqW :: failed to map ring slot memory");
+    }
+    slot.capacity = capacity;
   }
 
-  void VulkanInit::createPipelineDescriptors(model::VulkanPipelineDescriptors &pipelineDescriptors) const
+  void VulkanInit::destroyRingSlot(model::RingSlot &slot) const
   {
-    createPipelineGraphicsObjects(pipelineDescriptors);
-    vulkan_pipeline::recreatePipelineGeometryBuffers(device_, physicalDevice_, pipelineDescriptors);
+    if (slot.mapped != nullptr) {
+      vkUnmapMemory(device_, slot.memory);
+      slot.mapped = nullptr;
+    }
+    if (slot.buffer != VK_NULL_HANDLE) {
+      vkDestroyBuffer(device_, slot.buffer, nullptr);
+      slot.buffer = VK_NULL_HANDLE;
+    }
+    if (slot.memory != VK_NULL_HANDLE) {
+      vkFreeMemory(device_, slot.memory, nullptr);
+      slot.memory = VK_NULL_HANDLE;
+    }
+    slot.capacity = 0;
   }
 
-  void VulkanInit::destroyPipelineDescriptors(model::VulkanPipelineDescriptors &pipelineDescriptors) const
+  void VulkanInit::createMaterialBuffer(model::PipelineVk_ShapeGroup &pipeline) const
+  {
+    std::vector<model::MaterialGpu> materials;
+    materials.reserve(std::max<size_t>(1, pipeline.materials.size()));
+    for (const cmd::Material &material : pipeline.materials) {
+      materials.push_back(model::MaterialGpu{glm::vec4(material.color, 1.0F)});
+    }
+    // Буфер не может быть нулевого размера, поэтому держим хотя бы один материал по умолчанию.
+    if (materials.empty()) {
+      materials.push_back(model::MaterialGpu{glm::vec4(1.0F, 1.0F, 1.0F, 1.0F)});
+    }
+
+    const VkDeviceSize bufferSize = sizeof(model::MaterialGpu) * materials.size();
+    vulkan_pipeline::createBuffer(device_,
+                                  physicalDevice_,
+                                  bufferSize,
+                                  VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                  pipeline.gpu.materialBuffer,
+                                  pipeline.gpu.materialMemory);
+    vulkan_pipeline::uploadBufferData(device_, pipeline.gpu.materialMemory, materials.data(), bufferSize);
+  }
+
+  void VulkanInit::createPipelineDescriptorSet(model::PipelineVk_ShapeGroup &pipeline) const
+  {
+    VkDescriptorPoolSize poolSize{};
+    poolSize.type            = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    poolSize.descriptorCount = 1;
+
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = 1;
+    poolInfo.pPoolSizes    = &poolSize;
+    poolInfo.maxSets       = 1;
+
+    if (vkCreateDescriptorPool(device_, &poolInfo, nullptr, &pipeline.gpu.descriptorPool) != VK_SUCCESS) {
+      throw std::runtime_error("tB6vN2mKwQ :: failed to create pipeline descriptor pool");
+    }
+
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool     = pipeline.gpu.descriptorPool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts        = &materialSetLayout_;
+
+    if (vkAllocateDescriptorSets(device_, &allocInfo, &pipeline.gpu.materialSet) != VK_SUCCESS) {
+      throw std::runtime_error("rM9cV4nLpT :: failed to allocate material descriptor set");
+    }
+
+    VkDescriptorBufferInfo bufferInfo{};
+    bufferInfo.buffer = pipeline.gpu.materialBuffer;
+    bufferInfo.offset = 0;
+    bufferInfo.range  = VK_WHOLE_SIZE;
+
+    VkWriteDescriptorSet write{};
+    write.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet          = pipeline.gpu.materialSet;
+    write.dstBinding      = 0;
+    write.descriptorCount = 1;
+    write.descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    write.pBufferInfo     = &bufferInfo;
+
+    vkUpdateDescriptorSets(device_, 1, &write, 0, nullptr);
+  }
+
+  void VulkanInit::createPipeline(model::PipelineVk_ShapeGroup &pipeline)
   {
     if (device_ == VK_NULL_HANDLE) return;
 
+    // Статические vertex/index буферы мешей создаются один раз.
+    model::GeometryData geometry = vulkan_pipeline::buildStaticMesh(pipeline.meshes);
+    pipeline.gpu.meshRanges      = geometry.meshRanges;
+
+    if (!geometry.vertices.empty()) {
+      const VkDeviceSize bufferSize = sizeof(model::Vertex) * geometry.vertices.size();
+      vulkan_pipeline::createBuffer(device_,
+                                    physicalDevice_,
+                                    bufferSize,
+                                    VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                    pipeline.gpu.vertexBuffer,
+                                    pipeline.gpu.vertexMemory);
+      vulkan_pipeline::uploadBufferData(device_, pipeline.gpu.vertexMemory, geometry.vertices.data(), bufferSize);
+    }
+    if (!geometry.indices.empty()) {
+      const VkDeviceSize bufferSize = sizeof(uint32_t) * geometry.indices.size();
+      vulkan_pipeline::createBuffer(device_,
+                                    physicalDevice_,
+                                    bufferSize,
+                                    VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                    pipeline.gpu.indexBuffer,
+                                    pipeline.gpu.indexMemory);
+      vulkan_pipeline::uploadBufferData(device_, pipeline.gpu.indexMemory, geometry.indices.data(), bufferSize);
+    }
+
+    // Статический буфер материалов и его descriptor set.
+    createMaterialBuffer(pipeline);
+    createPipelineDescriptorSet(pipeline);
+
+    // Кольцо динамических буферов инстансов (по одному на кадр в полете).
+    uint32_t initialCapacity = 16;
+    if (pipeline.shapeCountFn) {
+      initialCapacity = std::max<uint32_t>(initialCapacity, static_cast<uint32_t>(pipeline.shapeCountFn()));
+    }
+    for (model::RingSlot &slot : pipeline.gpu.instanceRing) {
+      createRingSlot(slot, sizeof(model::InstanceData) * initialCapacity, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, initialCapacity);
+    }
+  }
+
+  void VulkanInit::destroyPipeline(model::PipelineVk_ShapeGroup &pipeline) const
+  {
+    if (device_ == VK_NULL_HANDLE) return;
+
+    // Замена/удаление pipeline происходит редко, поэтому полная остановка устройства допустима.
     vkDeviceWaitIdle(device_);
-    vulkan_pipeline::destroyPipelineGeometryBuffers(device_, pipelineDescriptors);
-    destroyPipelineGraphicsObjects(pipelineDescriptors);
-    pipelineDescriptors.vertices.clear();
-    pipelineDescriptors.indices.clear();
+
+    for (model::RingSlot &slot : pipeline.gpu.instanceRing) {
+      destroyRingSlot(slot);
+    }
+
+    if (pipeline.gpu.descriptorPool != VK_NULL_HANDLE) {
+      vkDestroyDescriptorPool(device_, pipeline.gpu.descriptorPool, nullptr);
+      pipeline.gpu.descriptorPool = VK_NULL_HANDLE;
+      pipeline.gpu.materialSet    = VK_NULL_HANDLE;
+    }
+    if (pipeline.gpu.materialBuffer != VK_NULL_HANDLE) {
+      vkDestroyBuffer(device_, pipeline.gpu.materialBuffer, nullptr);
+      pipeline.gpu.materialBuffer = VK_NULL_HANDLE;
+    }
+    if (pipeline.gpu.materialMemory != VK_NULL_HANDLE) {
+      vkFreeMemory(device_, pipeline.gpu.materialMemory, nullptr);
+      pipeline.gpu.materialMemory = VK_NULL_HANDLE;
+    }
+    if (pipeline.gpu.indexBuffer != VK_NULL_HANDLE) {
+      vkDestroyBuffer(device_, pipeline.gpu.indexBuffer, nullptr);
+      pipeline.gpu.indexBuffer = VK_NULL_HANDLE;
+    }
+    if (pipeline.gpu.indexMemory != VK_NULL_HANDLE) {
+      vkFreeMemory(device_, pipeline.gpu.indexMemory, nullptr);
+      pipeline.gpu.indexMemory = VK_NULL_HANDLE;
+    }
+    if (pipeline.gpu.vertexBuffer != VK_NULL_HANDLE) {
+      vkDestroyBuffer(device_, pipeline.gpu.vertexBuffer, nullptr);
+      pipeline.gpu.vertexBuffer = VK_NULL_HANDLE;
+    }
+    if (pipeline.gpu.vertexMemory != VK_NULL_HANDLE) {
+      vkFreeMemory(device_, pipeline.gpu.vertexMemory, nullptr);
+      pipeline.gpu.vertexMemory = VK_NULL_HANDLE;
+    }
+
+    pipeline.gpu.meshRanges.clear();
+    pipeline.gpu.drawBatches.clear();
   }
 
-  void VulkanInit::setShapeGroupData(const std::vector<cmd::Mesh>     &meshes,
-                                     const std::vector<cmd::Material> &materials,
-                                     const std::vector<cmd::Shape>    &shapes)
+  void VulkanInit::ensureInstanceCapacity(model::PipelineVk_ShapeGroup &pipeline, const uint32_t frame, const uint32_t count) const
   {
-    model::GeometryData geometry = vulkan_pipeline::buildShapeGroupGeometry(meshes, materials, shapes);
-    vertices_                    = std::move(geometry.vertices);
-    indices_                     = std::move(geometry.indices);
-    recreateGeometryBuffers();
+    model::RingSlot &slot = pipeline.gpu.instanceRing[frame];
+    if (count <= slot.capacity) {
+      return;
+    }
+    // Растем с запасом, чтобы не пересоздавать буфер каждый кадр.
+    const uint32_t newCapacity = std::max(count, slot.capacity * 2);
+    destroyRingSlot(slot);
+    createRingSlot(slot, sizeof(model::InstanceData) * newCapacity, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, newCapacity);
   }
 
-  void VulkanInit::setShapeGroupData(model::VulkanPipelineDescriptors &pipelineDescriptors,
-                                     const std::vector<cmd::Mesh>     &meshes,
-                                     const std::vector<cmd::Material> &materials,
-                                     const std::vector<cmd::Shape>    &shapes) const
+  void VulkanInit::updateInstanceData(model::PipelineVk_ShapeGroup &pipeline, const uint32_t frame) const
   {
-    vulkan_pipeline::setShapeGroupData(device_, physicalDevice_, pipelineDescriptors, meshes, materials, shapes);
+    const uint32_t count = static_cast<uint32_t>(pipeline.shapes.size());
+    ensureInstanceCapacity(pipeline, frame, count);
+
+    model::RingSlot &slot = pipeline.gpu.instanceRing[frame];
+    pipeline.gpu.drawBatches =
+        vulkan_pipeline::groupShapes(pipeline.shapes,
+                                     pipeline.gpu.meshRanges,
+                                     static_cast<model::InstanceData *>(slot.mapped),
+                                     slot.capacity,
+                                     static_cast<uint32_t>(pipeline.materials.size()));
   }
 
   void VulkanInit::createInstance()
@@ -554,7 +713,6 @@ namespace app {
     const float aspect     = static_cast<float>(swapChainExtent_.width) / static_cast<float>(swapChainExtent_.height);
     transforms_.projection = glm::perspective(glm::radians(cameraFovDegrees_), aspect, cameraNearPlane_, cameraFarPlane_);
     transforms_.projection[1][1] *= -1.0F;
-    pushConstants_.model      = transforms_.model;
     pushConstants_.view       = transforms_.view;
     pushConstants_.projection = transforms_.projection;
   }
@@ -694,9 +852,20 @@ namespace app {
     }
   }
 
-  void VulkanInit::createGraphicsPipeline()
+  void VulkanInit::createDescriptorSetLayouts()
   {
-    vulkan_pipeline::createGraphicsPipeline(device_, swapChainExtent_, renderPass_, pipelineLayout_, graphicsPipeline_);
+    vulkan_pipeline::createDescriptorSetLayouts(device_, globalSetLayout_, materialSetLayout_);
+  }
+
+  void VulkanInit::createSharedPipeline()
+  {
+    vulkan_pipeline::createGraphicsPipeline(device_,
+                                            swapChainExtent_,
+                                            renderPass_,
+                                            globalSetLayout_,
+                                            materialSetLayout_,
+                                            sharedPipelineLayout_,
+                                            sharedPipeline_);
   }
 
   void VulkanInit::createFramebuffers()
@@ -740,151 +909,91 @@ namespace app {
     }
   }
 
-  [[nodiscard]] uint32_t VulkanInit::findMemoryType(const uint32_t typeFilter, const VkMemoryPropertyFlags properties) const
+  void VulkanInit::updateLightDescriptor(const uint32_t frame) const
   {
-    // Свойства памяти физического устройства Vulkan.
-    VkPhysicalDeviceMemoryProperties memoryProperties{};
-    // Получаем свойства памяти физического устройства Vulkan.
-    vkGetPhysicalDeviceMemoryProperties(physicalDevice_, &memoryProperties);
+    VkDescriptorBufferInfo bufferInfo{};
+    bufferInfo.buffer = lightRing_[frame].buffer;
+    bufferInfo.offset = 0;
+    bufferInfo.range  = VK_WHOLE_SIZE;
 
-    for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; ++i) {
-      // ReSharper disable once CppRedundantParentheses
-      if ((typeFilter & (1 << i)) != 0 && (memoryProperties.memoryTypes[i].propertyFlags & properties) == properties) {
-        return i;
-      }
-    }
+    VkWriteDescriptorSet write{};
+    write.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet          = lightSets_[frame];
+    write.dstBinding      = 0;
+    write.descriptorCount = 1;
+    write.descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    write.pBufferInfo     = &bufferInfo;
 
-    throw std::runtime_error("mR7cQ2vLpN :: failed to find suitable Vulkan memory type");
+    vkUpdateDescriptorSets(device_, 1, &write, 0, nullptr);
   }
 
-  void VulkanInit::createBuffer(const VkDeviceSize          size,
-                                const VkBufferUsageFlags    usage,
-                                const VkMemoryPropertyFlags properties,
-                                VkBuffer                   &buffer,
-                                VkDeviceMemory             &bufferMemory) const
+  void VulkanInit::writeLightSlot(const uint32_t frame)
   {
-    // Параметры создания buffer Vulkan.
-    VkBufferCreateInfo bufferInfo{};
-    bufferInfo.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO; // Тип структуры создания buffer.
-    bufferInfo.size        = size;                                 // Размер buffer в байтах.
-    bufferInfo.usage       = usage;                                // Назначение buffer: vertex, index или другое.
-    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;            // Buffer используется одним семейством очередей.
+    model::RingSlot &slot = lightRing_[frame];
+    const uint32_t   need = static_cast<uint32_t>(lightData_.size());
 
-    // Создаем buffer Vulkan.
-    if (vkCreateBuffer(device_, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
-      throw std::runtime_error("zP4hT8nVqS :: failed to create Vulkan buffer");
+    if (need > slot.capacity) {
+      const uint32_t newCapacity = std::max(need, slot.capacity * 2);
+      destroyRingSlot(slot);
+      createRingSlot(slot,
+                     sizeof(model::LightBufferHeader) + sizeof(model::LightGpu) * newCapacity,
+                     VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                     newCapacity);
+      updateLightDescriptor(frame);
     }
 
-    // Требования памяти Vulkan для buffer.
-    VkMemoryRequirements memoryRequirements{};
-    // Получаем требования памяти Vulkan для buffer.
-    vkGetBufferMemoryRequirements(device_, buffer, &memoryRequirements);
+    auto *base = static_cast<uint8_t *>(slot.mapped);
 
-    // Параметры выделения памяти Vulkan.
-    VkMemoryAllocateInfo allocInfo{};
-    allocInfo.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;                        // Тип структуры выделения памяти.
-    allocInfo.allocationSize  = memoryRequirements.size;                                       // Размер выделяемой памяти.
-    allocInfo.memoryTypeIndex = findMemoryType(memoryRequirements.memoryTypeBits, properties); // Индекс подходящего типа памяти.
+    model::LightBufferHeader header{};
+    header.count   = need;
+    header.ambient = lightAmbient_;
+    std::memcpy(base, &header, sizeof(header));
 
-    // Выделяем память Vulkan для buffer.
-    if (vkAllocateMemory(device_, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
-      throw std::runtime_error("vN9xD3kWsE :: failed to allocate Vulkan buffer memory");
-    }
-
-    // Привязываем память Vulkan к buffer.
-    if (vkBindBufferMemory(device_, buffer, bufferMemory, 0) != VK_SUCCESS) {
-      throw std::runtime_error("qF6sL1xRcM :: failed to bind Vulkan buffer memory");
+    if (need > 0) {
+      std::memcpy(base + sizeof(model::LightBufferHeader), lightData_.data(), sizeof(model::LightGpu) * need);
     }
   }
 
-  void VulkanInit::uploadBufferData(const VkDeviceMemory bufferMemory, const void *source, const VkDeviceSize size) const
+  void VulkanInit::createLightResources()
   {
-    void *data = nullptr;
-    // Отображаем память Vulkan в адресное пространство CPU.
-    if (vkMapMemory(device_, bufferMemory, 0, size, 0, &data) != VK_SUCCESS) {
-      throw std::runtime_error("jK8vM5tHbQ :: failed to map Vulkan buffer memory");
+    // Пул, из которого выделяются descriptor sets света (по одному на кадр в полете).
+    VkDescriptorPoolSize poolSize{};
+    poolSize.type            = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    poolSize.descriptorCount = MAX_FRAMES_IN_FLIGHT;
+
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = 1;
+    poolInfo.pPoolSizes    = &poolSize;
+    poolInfo.maxSets       = MAX_FRAMES_IN_FLIGHT;
+
+    if (vkCreateDescriptorPool(device_, &poolInfo, nullptr, &lightPool_) != VK_SUCCESS) {
+      throw std::runtime_error("dV8nR3mKpL :: failed to create light descriptor pool");
     }
-    std::memcpy(data, source, size);
-    // Завершаем отображение памяти Vulkan.
-    vkUnmapMemory(device_, bufferMemory);
-  }
 
-  void VulkanInit::destroyGeometryBuffers()
-  {
-    if (indexBuffer_ != VK_NULL_HANDLE) {
-      vkDestroyBuffer(device_, indexBuffer_, nullptr);
-      indexBuffer_ = VK_NULL_HANDLE;
+    std::array<VkDescriptorSetLayout, MAX_FRAMES_IN_FLIGHT> layouts{};
+    layouts.fill(globalSetLayout_);
+
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool     = lightPool_;
+    allocInfo.descriptorSetCount = MAX_FRAMES_IN_FLIGHT;
+    allocInfo.pSetLayouts        = layouts.data();
+
+    if (vkAllocateDescriptorSets(device_, &allocInfo, lightSets_.data()) != VK_SUCCESS) {
+      throw std::runtime_error("kP2sT7mNwB :: failed to allocate light descriptor sets");
     }
-    if (indexBufferMemory_ != VK_NULL_HANDLE) {
-      vkFreeMemory(device_, indexBufferMemory_, nullptr);
-      indexBufferMemory_ = VK_NULL_HANDLE;
+
+    constexpr uint32_t initialLightCapacity = 8;
+    for (uint32_t frame = 0; frame < MAX_FRAMES_IN_FLIGHT; ++frame) {
+      createRingSlot(lightRing_[frame],
+                     sizeof(model::LightBufferHeader) + sizeof(model::LightGpu) * initialLightCapacity,
+                     VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                     initialLightCapacity);
+      updateLightDescriptor(frame);
+      // Изначально источников света нет: пишем заголовок с count = 0.
+      writeLightSlot(frame);
     }
-    if (vertexBuffer_ != VK_NULL_HANDLE) {
-      vkDestroyBuffer(device_, vertexBuffer_, nullptr);
-      vertexBuffer_ = VK_NULL_HANDLE;
-    }
-    if (vertexBufferMemory_ != VK_NULL_HANDLE) {
-      vkFreeMemory(device_, vertexBufferMemory_, nullptr);
-      vertexBufferMemory_ = VK_NULL_HANDLE;
-    }
-  }
-
-  void VulkanInit::recreateGeometryBuffers()
-  {
-    if (device_ == VK_NULL_HANDLE) return;
-    vkDeviceWaitIdle(device_);
-    destroyGeometryBuffers();
-    createVertexBuffer();
-    createIndexBuffer();
-  }
-
-  void VulkanInit::createPipelineGraphicsObjects(model::VulkanPipelineDescriptors &pipelineDescriptors) const
-  {
-    if (device_ == VK_NULL_HANDLE || renderPass_ == VK_NULL_HANDLE) return;
-
-    vulkan_pipeline::createGraphicsPipeline(device_,
-                                            swapChainExtent_,
-                                            renderPass_,
-                                            pipelineDescriptors.pipelineLayout,
-                                            pipelineDescriptors.graphicsPipeline);
-  }
-
-  void VulkanInit::destroyPipelineGraphicsObjects(model::VulkanPipelineDescriptors &pipelineDescriptors) const
-  {
-    if (pipelineDescriptors.graphicsPipeline != VK_NULL_HANDLE) {
-      vkDestroyPipeline(device_, pipelineDescriptors.graphicsPipeline, nullptr);
-      pipelineDescriptors.graphicsPipeline = VK_NULL_HANDLE;
-    }
-    if (pipelineDescriptors.pipelineLayout != VK_NULL_HANDLE) {
-      vkDestroyPipelineLayout(device_, pipelineDescriptors.pipelineLayout, nullptr);
-      pipelineDescriptors.pipelineLayout = VK_NULL_HANDLE;
-    }
-  }
-
-  void VulkanInit::createVertexBuffer()
-  {
-    if (vertices_.empty()) return;
-
-    const VkDeviceSize bufferSize = sizeof(vertices_[0]) * vertices_.size();
-    createBuffer(bufferSize,
-                 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                 vertexBuffer_,
-                 vertexBufferMemory_);
-    uploadBufferData(vertexBufferMemory_, vertices_.data(), bufferSize);
-  }
-
-  void VulkanInit::createIndexBuffer()
-  {
-    if (indices_.empty()) return;
-
-    const VkDeviceSize bufferSize = sizeof(indices_[0]) * indices_.size();
-    createBuffer(bufferSize,
-                 VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                 indexBuffer_,
-                 indexBufferMemory_);
-    uploadBufferData(indexBufferMemory_, indices_.data(), bufferSize);
   }
 
   void VulkanInit::createCommandBuffers()
@@ -904,37 +1013,18 @@ namespace app {
     }
   }
 
-  void VulkanInit::recordCommandBuffer(const VkCommandBuffer commandBuffer, const uint32_t imageIndex) const
+  void VulkanInit::recordCommandBuffer(const VkCommandBuffer commandBuffer, const uint32_t imageIndex, const std::vector<model::PipelineRenderData> &renderDatas) const
   {
-    std::vector<model::PipelineDrawData> pipelineDraws;
-    pipelineDraws.reserve(1 + pipelineDescriptors_.size());
-    pipelineDraws.push_back(model::PipelineDrawData{
-        .graphicsPipeline = graphicsPipeline_,
-        .vertexBuffer     = vertexBuffer_,
-        .indexBuffer      = indexBuffer_,
-        .indices          = &indices_,
-        .pipelineLayout   = pipelineLayout_,
-    });
-
-    for (const model::VulkanPipelineDescriptors *pipelineDescriptors : pipelineDescriptors_) {
-      if (pipelineDescriptors == nullptr) continue;
-
-      pipelineDraws.push_back(model::PipelineDrawData{
-          .graphicsPipeline = pipelineDescriptors->graphicsPipeline,
-          .vertexBuffer     = pipelineDescriptors->vertexBuffer,
-          .indexBuffer      = pipelineDescriptors->indexBuffer,
-          .indices          = &pipelineDescriptors->indices,
-          .pipelineLayout   = pipelineDescriptors->pipelineLayout,
-      });
-    }
-
     vulkan_pipeline::recordCommandBuffer(commandBuffer,
                                          imageIndex,
                                          renderPass_,
                                          swapChainFramebuffers_,
                                          swapChainExtent_,
-                                         pipelineDraws,
-                                         pushConstants_);
+                                         sharedPipeline_,
+                                         sharedPipelineLayout_,
+                                         lightSets_[currentFrame_],
+                                         pushConstants_,
+                                         renderDatas);
   }
 
   void VulkanInit::createSyncObjects()
@@ -980,6 +1070,23 @@ namespace app {
   {
     cleanupSwapChain();
 
+    for (model::RingSlot &slot : lightRing_) {
+      destroyRingSlot(slot);
+    }
+    if (lightPool_ != VK_NULL_HANDLE) {
+      vkDestroyDescriptorPool(device_, lightPool_, nullptr);
+      lightPool_ = VK_NULL_HANDLE;
+    }
+
+    if (materialSetLayout_ != VK_NULL_HANDLE) {
+      vkDestroyDescriptorSetLayout(device_, materialSetLayout_, nullptr);
+      materialSetLayout_ = VK_NULL_HANDLE;
+    }
+    if (globalSetLayout_ != VK_NULL_HANDLE) {
+      vkDestroyDescriptorSetLayout(device_, globalSetLayout_, nullptr);
+      globalSetLayout_ = VK_NULL_HANDLE;
+    }
+
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
       // Уничтожаем Vulkan semaphore ожидания завершения рендера.
       vkDestroySemaphore(device_, renderFinishedSemaphores_[i], nullptr);
@@ -988,13 +1095,6 @@ namespace app {
       // Уничтожаем Vulkan fence кадра.
       vkDestroyFence(device_, inFlightFences_[i], nullptr);
     }
-
-    destroyGeometryBuffers();
-    for (model::VulkanPipelineDescriptors *pipelineDescriptors : pipelineDescriptors_) {
-      if (pipelineDescriptors == nullptr) continue;
-      vulkan_pipeline::destroyPipelineGeometryBuffers(device_, *pipelineDescriptors);
-    }
-    pipelineDescriptors_.clear();
 
     // Уничтожаем пул команд Vulkan.
     vkDestroyCommandPool(device_, commandPool_, nullptr);
@@ -1006,9 +1106,9 @@ namespace app {
     vkDestroyInstance(instance_, nullptr);
   }
 
-  void VulkanInit::drawFrame(bool &framebufferResized)
+  void VulkanInit::drawFrame(const std::vector<model::PipelineVk_ShapeGroup *> &pipelines, bool &framebufferResized)
   {
-    // Ждем fence Vulkan текущего кадра.
+    // Ждем fence Vulkan текущего кадра. После этого GPU точно закончил работу с буферами этого кадра.
     vkWaitForFences(device_, 1, &inFlightFences_[currentFrame_], VK_TRUE, UINT64_MAX);
 
     uint32_t imageIndex = 0;
@@ -1025,9 +1125,31 @@ namespace app {
 
     // Сбрасываем fence Vulkan текущего кадра.
     vkResetFences(device_, 1, &inFlightFences_[currentFrame_]);
+
+    // Безопасно обновляем буферы текущего кадра (GPU их больше не читает).
+    if (lightUploadsRemaining_ > 0) {
+      writeLightSlot(currentFrame_);
+      --lightUploadsRemaining_;
+    }
+
+    std::vector<model::PipelineRenderData> renderDatas;
+    renderDatas.reserve(pipelines.size());
+    for (model::PipelineVk_ShapeGroup *pipeline : pipelines) {
+      if (pipeline == nullptr) continue;
+
+      updateInstanceData(*pipeline, currentFrame_);
+      renderDatas.push_back(model::PipelineRenderData{
+          .materialSet    = pipeline->gpu.materialSet,
+          .vertexBuffer   = pipeline->gpu.vertexBuffer,
+          .indexBuffer    = pipeline->gpu.indexBuffer,
+          .instanceBuffer = pipeline->gpu.instanceRing[currentFrame_].buffer,
+          .batches        = &pipeline->gpu.drawBatches,
+      });
+    }
+
     // Сбрасываем command buffer Vulkan текущего кадра.
     vkResetCommandBuffer(commandBuffers_[currentFrame_], 0);
-    recordCommandBuffer(commandBuffers_[currentFrame_], imageIndex);
+    recordCommandBuffer(commandBuffers_[currentFrame_], imageIndex, renderDatas);
 
     // Semaphore Vulkan, которого ждет отправка команд.
     const VkSemaphore waitSemaphores[]          = {imageAvailableSemaphores_[currentFrame_]};
@@ -1093,11 +1215,7 @@ namespace app {
     createSwapChain();
     createImageViews();
     createRenderPass();
-    createGraphicsPipeline();
-    for (model::VulkanPipelineDescriptors *pipelineDescriptors : pipelineDescriptors_) {
-      if (pipelineDescriptors == nullptr) continue;
-      createPipelineGraphicsObjects(*pipelineDescriptors);
-    }
+    createSharedPipeline();
     createFramebuffers();
   }
 
@@ -1109,22 +1227,21 @@ namespace app {
     }
     swapChainFramebuffers_.clear();
 
-    // Уничтожаем graphics pipeline Vulkan.
-    vkDestroyPipeline(device_, graphicsPipeline_, nullptr);
-    graphicsPipeline_ = VK_NULL_HANDLE;
-
-    // Уничтожаем layout pipeline Vulkan.
-    vkDestroyPipelineLayout(device_, pipelineLayout_, nullptr);
-    pipelineLayout_ = VK_NULL_HANDLE;
-
-    for (model::VulkanPipelineDescriptors *pipelineDescriptors : pipelineDescriptors_) {
-      if (pipelineDescriptors == nullptr) continue;
-      destroyPipelineGraphicsObjects(*pipelineDescriptors);
+    // Уничтожаем общий graphics pipeline Vulkan.
+    if (sharedPipeline_ != VK_NULL_HANDLE) {
+      vkDestroyPipeline(device_, sharedPipeline_, nullptr);
+      sharedPipeline_ = VK_NULL_HANDLE;
+    }
+    if (sharedPipelineLayout_ != VK_NULL_HANDLE) {
+      vkDestroyPipelineLayout(device_, sharedPipelineLayout_, nullptr);
+      sharedPipelineLayout_ = VK_NULL_HANDLE;
     }
 
     // Уничтожаем render pass Vulkan.
-    vkDestroyRenderPass(device_, renderPass_, nullptr);
-    renderPass_ = VK_NULL_HANDLE;
+    if (renderPass_ != VK_NULL_HANDLE) {
+      vkDestroyRenderPass(device_, renderPass_, nullptr);
+      renderPass_ = VK_NULL_HANDLE;
+    }
 
     for (const VkImageView imageView : swapChainImageViews_) {
       // Уничтожаем image view Vulkan.

@@ -2,7 +2,9 @@
 module;
 
 #include <SDL3/SDL.h>
+#include <glm/geometric.hpp>
 #include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
 
 #include <format>
 #include <iostream>
@@ -42,6 +44,7 @@ namespace app {
 
     std::unordered_map<std::string, std::unique_ptr<model::LightVk>> light_map_;
     std::vector<std::string>                                         light_ids_;
+    bool                                                             lightsDirty_ = false;
 
     sync::SyncQueue<cmd::CmdPtr> commands_;
 
@@ -88,11 +91,11 @@ namespace app {
       vulkan_.createSwapChain();
       vulkan_.createImageViews();
       vulkan_.createRenderPass();
-      vulkan_.createGraphicsPipeline();
+      vulkan_.createDescriptorSetLayouts();
+      vulkan_.createSharedPipeline();
       vulkan_.createFramebuffers();
       vulkan_.createCommandPool();
-      vulkan_.createVertexBuffer();
-      vulkan_.createIndexBuffer();
+      vulkan_.createLightResources();
       vulkan_.createCommandBuffers();
       vulkan_.createSyncObjects();
     }
@@ -113,9 +116,13 @@ namespace app {
 
         executeAllCommands();
         updatePipelineRuntimeData();
-        uploadPipelineRuntimeData();
 
-        vulkan_.drawFrame(framebufferResized_);
+        if (lightsDirty_) {
+          rebuildLights();
+          lightsDirty_ = false;
+        }
+
+        vulkan_.drawFrame(collectShapeGroupPipelines(), framebufferResized_);
       }
 
       vulkan_.waitIdle();
@@ -123,6 +130,17 @@ namespace app {
 
     void cleanup()
     {
+      // Уничтожаем Vulkan ресурсы каждого pipeline, пока устройство еще живо.
+      for (const std::string &pipelineId : pipeline_ids_) {
+        const auto pipelineIter = pipeline_map_.find(pipelineId);
+        if (pipelineIter == pipeline_map_.end()) continue;
+        if (auto *shapeGroup = dynamic_cast<model::PipelineVk_ShapeGroup *>(pipelineIter->second.get())) {
+          vulkan_.destroyPipeline(*shapeGroup);
+        }
+      }
+      pipeline_map_.clear();
+      pipeline_ids_.clear();
+
       vulkan_.cleanup();
 
       // Уничтожаем окно SDL.
@@ -130,6 +148,41 @@ namespace app {
 
       // Завершаем работу SDL.
       SDL_Quit();
+    }
+
+    // Собирает указатели на все активные shape-group pipeline в порядке регистрации.
+    std::vector<model::PipelineVk_ShapeGroup *> collectShapeGroupPipelines()
+    {
+      std::vector<model::PipelineVk_ShapeGroup *> pipelines;
+      pipelines.reserve(pipeline_ids_.size());
+      for (const std::string &pipelineId : pipeline_ids_) {
+        const auto pipelineIter = pipeline_map_.find(pipelineId);
+        if (pipelineIter == pipeline_map_.end()) continue;
+        if (auto *shapeGroup = dynamic_cast<model::PipelineVk_ShapeGroup *>(pipelineIter->second.get())) {
+          pipelines.push_back(shapeGroup);
+        }
+      }
+      return pipelines;
+    }
+
+    // Перестраивает GPU-набор источников света из light_map_ и передает его рендереру.
+    void rebuildLights()
+    {
+      std::vector<model::LightGpu> lights;
+      lights.reserve(light_ids_.size());
+      for (const std::string &lightId : light_ids_) {
+        const auto lightIter = light_map_.find(lightId);
+        if (lightIter == light_map_.end()) continue;
+        if (const auto *sun = dynamic_cast<model::LightVk_Sun *>(lightIter->second.get())) {
+          const glm::vec3 direction =
+              glm::dot(sun->direction, sun->direction) > 0.0F ? glm::normalize(sun->direction) : glm::vec3(0.0F, 0.0F, -1.0F);
+          lights.push_back(model::LightGpu{
+              .directionType = glm::vec4(direction, 0.0F),
+              .colorForce    = glm::vec4(sun->color, sun->force),
+          });
+        }
+      }
+      vulkan_.setLights(std::move(lights));
     }
 
     void executeAllCommands()
@@ -161,25 +214,6 @@ namespace app {
       }
     }
 
-    void uploadPipelineRuntimeData()
-    {
-      std::vector<model::VulkanPipelineDescriptors *> pipelineDescriptors;
-      pipelineDescriptors.reserve(pipeline_ids_.size());
-
-      for (const std::string &pipelineId : pipeline_ids_) {
-        const auto pipelineIter = pipeline_map_.find(pipelineId);
-        if (pipelineIter == pipeline_map_.end()) continue;
-
-        auto *shapeGroup = dynamic_cast<model::PipelineVk_ShapeGroup *>(pipelineIter->second.get());
-        if (shapeGroup == nullptr) continue;
-
-        vulkan_.setShapeGroupData(shapeGroup->descriptors, shapeGroup->meshes, shapeGroup->materials, shapeGroup->shapes);
-        pipelineDescriptors.push_back(&shapeGroup->descriptors);
-      }
-
-      vulkan_.setPipelineDescriptors(pipelineDescriptors);
-    }
-
     // ReSharper disable once CppPassValueParameterByConstReference
     void execute_Cmd(const cmd::CmdPtr cmdPtr)
     {
@@ -193,6 +227,10 @@ namespace app {
       }
       if (const auto command = std::dynamic_pointer_cast<cmd::CmdSetPipeline_ShapeGroup>(cmdPtr)) {
         execute_CmdPipeline_ShapeGroup(command);
+        return;
+      }
+      if (const auto command = std::dynamic_pointer_cast<cmd::CmdRemovePipeline>(cmdPtr)) {
+        execute_CmdRemovePipeline(command);
         return;
       }
       if (const auto command = std::dynamic_pointer_cast<cmd::CmdSetLight_Sun>(cmdPtr)) {
@@ -240,10 +278,15 @@ namespace app {
       pipeline->materials        = cmdPtr->materials;
       pipeline->shapeCountFn     = cmdPtr->shapeCountFn;
       pipeline->populateShapesFn = cmdPtr->populateShapesFn;
-      vulkan_.createPipelineDescriptors(pipeline->descriptors);
 
+      // Сначала создаем новый pipeline: если бросит исключение, старый останется валидным.
+      vulkan_.createPipeline(*pipeline);
+
+      // Только после успешного создания нового уничтожаем ресурсы старого pipeline.
       if (!isNewPipeline) {
-        vulkan_.destroyPipelineDescriptors(existingPipelineIter->second->descriptors);
+        if (auto *oldShapeGroup = dynamic_cast<model::PipelineVk_ShapeGroup *>(existingPipelineIter->second.get())) {
+          vulkan_.destroyPipeline(*oldShapeGroup);
+        }
       }
 
       pipeline_map_[cmdPtr->id] = std::move(pipeline);
@@ -251,6 +294,19 @@ namespace app {
       if (isNewPipeline) {
         pipeline_ids_.push_back(cmdPtr->id);
       }
+    }
+
+    // ReSharper disable once CppPassValueParameterByConstReference
+    void execute_CmdRemovePipeline(const std::shared_ptr<cmd::CmdRemovePipeline> cmdPtr)
+    {
+      const auto pipelineIter = pipeline_map_.find(cmdPtr->id);
+      if (pipelineIter == pipeline_map_.end()) return;
+
+      if (auto *shapeGroup = dynamic_cast<model::PipelineVk_ShapeGroup *>(pipelineIter->second.get())) {
+        vulkan_.destroyPipeline(*shapeGroup);
+      }
+      pipeline_map_.erase(pipelineIter);
+      std::erase(pipeline_ids_, cmdPtr->id);
     }
 
     void execute_CmdSetLight_Sun(const std::shared_ptr<cmd::CmdSetLight_Sun> cmdPtr)
@@ -266,14 +322,15 @@ namespace app {
       sun->direction = cmdPtr->direction;
       sun->color     = cmdPtr->color;
 
-      vulkan_.setSunLight(sun->direction, sun->color, sun->force);
-
       std::unique_ptr<model::LightVk> light = std::move(sun);
       light_map_[cmdPtr->id]                = std::move(light);
 
       if (isNewLight) {
         light_ids_.push_back(cmdPtr->id);
       }
+
+      // Содержимое света изменилось - GPU-буфер света будет обновлен в начале кадра.
+      lightsDirty_ = true;
     }
 
     void execute_CmdChangeCamera(const std::shared_ptr<cmd::CmdChangeCamera> cmdPtr)
