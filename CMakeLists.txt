@@ -30,6 +30,7 @@ target_sources(
   src/utils/sync_map.cppm
   src/utils/sync_vector.cppm
   src/utils/sync_queue.cppm
+  src/utils/generator.cppm
   src/cmd/cmd.cppm
   src/cmd/cmd_pipeline.cppm
   src/cmd/cmd_light.cppm

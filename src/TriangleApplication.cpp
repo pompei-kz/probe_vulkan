@@ -199,17 +199,8 @@ namespace app {
     // ReSharper disable once CppPassValueParameterByConstReference
     void execute_CmdSequence(const std::shared_ptr<cmd::CmdSequence> cmdPtr)
     {
-      if (cmdPtr->sync) {
-        for (cmd::CmdPtr subCmdPtr : cmdPtr->sequence) {
-          execute_Cmd(subCmdPtr);
-        }
-        return;
-      }
-
-      {
-        for (cmd::CmdPtr subCmdPtr : cmdPtr->sequence) {
-          commands_.push_back(subCmdPtr);
-        }
+      for (const cmd::CmdPtr subCmdPtr : cmdPtr->sequence) {
+        execute_Cmd(subCmdPtr);
       }
     }
 
@@ -219,7 +210,8 @@ namespace app {
       // TODO pipeline stored in map: `this->pipeline_map_`
       // TODO pipelines must be draw in sequence of `this->pipeline_ids_`
 
-      // TODO here you need initialize pipeline and put all parameters for pipeline in struct `PipelineVk_ShapeGroup` and put it to `this->pipeline_ids_`
+      // TODO here you need initialize pipeline and put all parameters for pipeline in struct `PipelineVk_ShapeGroup` and put it to
+      // TODO `this->pipeline_ids_`
     }
 
     void execute_CmdSetLight_Sun(const std::shared_ptr<cmd::CmdSetLight_Sun> cmdPtr)

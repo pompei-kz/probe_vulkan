@@ -9,54 +9,131 @@ import utils;
 
 export namespace cmd {
 
+  /**
+   * Abstract class for all commands
+   */
   struct Cmd
   {
     virtual ~Cmd() = default;
   };
 
-  using CmdPtr     = std::shared_ptr<Cmd>;
+  /**
+   * Reference to command
+   */
+  using CmdPtr = std::shared_ptr<Cmd>;
+
+  /**
+   * Command factory function
+   */
   using CmdFactory = std::function<CmdPtr()>;
 
+  /**
+   * Command to print log message into console.
+   */
   struct CmdPrintToConsole : Cmd
   {
     std::string message;
   };
 
+  /**
+   * Command that groups multiple commands into a single command.
+   *
+   * Commands stored in `sequence` are executed in the order in which
+   * they appear in the vector.
+   *
+   * This command is useful when several commands need to be represented,
+   * stored, or executed as a single logical command.
+   */
   struct CmdSequence : Cmd
   {
-    bool                sync = true;
     std::vector<CmdPtr> sequence;
   };
 
-  // This command changes camera parameters.
-  // Each parameter has boolean flag
+  /**
+   * Clipping planes of the camera view frustum.
+   */
+  struct Planes
+  {
+    /**
+     * Distance from the camera to the near clipping plane.
+     *
+     * Geometry closer than this distance will not be rendered.
+     */
+    float near;
+
+    /**
+     * Distance from the camera to the far clipping plane.
+     *
+     * Geometry farther than this distance will not be rendered.
+     */
+    float far;
+  };
+
+  /**
+   * Command that updates camera parameters.
+   *
+   * Each camera property has a corresponding to apply flag.
+   * A property is updated only if its apply flag is set to true.
+   */
   struct CmdChangeCamera : Cmd
   {
-    // apply position
+    /**
+     * Apply camera position.
+     */
     bool positionApply = false;
-    // move camera to this position
+
+    /**
+     * New camera position in world space.
+     */
     glm::vec3 position{0.0F, 0.0F, 1.0F};
 
-    // apply forward vector
+    /**
+     * Apply camera forward direction.
+     */
     bool forwardApply = false;
-    // forward vector - the vector in which the camera is looking
+
+    /**
+     * Forward direction of the camera.
+     * This vector defines the direction the camera is looking toward.
+     */
     glm::vec3 forward{0.0F, 0.0F, -1.0F};
 
-    // apply up vector
+    /**
+     * Apply camera up direction.
+     */
     bool upApply = false;
-    // up vector - vector pointing upward when the camera is looking
+
+    /**
+     * Up direction of the camera.
+     *
+     * This vector does not have to be normalized or perpendicular to
+     * `forward`. The system will recalculate it so that the resulting
+     * up vector is normalized and perpendicular to `forward`.
+     *
+     * The original `up`, `forward`, and recalculated `up` vectors must lie
+     * in the same plane.
+     */
     glm::vec3 up{0.0F, 1.0F, 0.0F};
 
-    // apply plan parameters - camera sees only between these plans
-    bool planeApply = false;
-    // near plan parameter - distance alongside forward vector to near plan
-    float nearPlane = 0.1F;
-    // far plan parameter - distance alongside forward vector to far plan
-    float farPlane  = 100.0F;
+    /**
+     * Apply near and far clipping plane parameters.
+     */
+    bool planesApply = false;
 
-    // apply Field of View
-    bool fovApply    = false;
-    // Field of View in degrees of camera
+    /**
+     * Near and far clipping planes of the camera frustum.
+     * Only geometry located between these planes is rendered.
+     */
+    Planes planes;
+
+    /**
+     * Apply field of view.
+     */
+    bool fovDegreesApply = false;
+
+    /**
+     * Vertical field of view in degrees.
+     */
     float fovDegrees = 45.0F;
   };
 

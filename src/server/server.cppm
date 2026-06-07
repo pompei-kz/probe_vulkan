@@ -20,34 +20,56 @@ export namespace server {
   public:
     cmd::CmdPtr start()
     {
-      auto ret = std::make_shared<cmd::CmdSetPipeline_ShapeGroup>();
-      ret->id  = "fp7c4pmXp1";
+      auto ret = std::make_shared<cmd::CmdSequence>();
 
-      ret->meshes.resize(1);
-      gen::populateWithSphera(&ret->meshes[0], 1, 16, 16);
+      {
+        const auto camera = std::make_shared<cmd::CmdChangeCamera>();
 
-      ret->materials.resize(2);
-      ret->materials[0].color = glm::vec3(0.0F, 0.5F, 1.0F);
-      ret->materials[1].color = glm::vec3(0.0F, 1.0F, 0.0F);
+        camera->position   = glm::vec3(0.0F, 0.0F, -10.0F);
+        camera->forward    = glm::vec3(0.0F, 0.0F, 1.0F);
+        camera->up         = glm::vec3(0.0F, -1.0F, 0.0F);
+        camera->planes     = cmd::Planes{0.01, 100};
+        camera->fovDegrees = 45;
 
-      ret->shapeCountFn = [] { return 3; };
+        camera->positionApply   = true;
+        camera->forwardApply    = true;
+        camera->upApply         = true;
+        camera->planesApply     = true;
+        camera->fovDegreesApply = true;
 
-      ret->populateShapesFn = [](std::vector<cmd::Shape> &shapes) {
-        for (auto shape : shapes) {
-          shape.meshIndex     = 0;
-          shape.materialIndex = 0;
-          shape.rotateX       = 0;
-          shape.rotateY       = 0;
-          shape.rotateZ       = 0;
-          shape.scaleX        = 1;
-          shape.scaleY        = 1;
-          shape.scaleZ        = 1;
-        }
+        ret->sequence.push_back(camera);
+      }
 
-        shapes[0].position = glm::vec3(0.0F, 0.0F, 0.0F);
-        shapes[1].position = glm::vec3(2.0F, 0.0F, 0.0F);
-        shapes[2].position = glm::vec3(0.0F, 2.0F, 0.0F);
-      };
+      {
+        const auto sphera = std::make_shared<cmd::CmdSetPipeline_ShapeGroup>();
+        sphera->id        = "fp7c4pmXp1";
+
+        sphera->meshes.resize(1);
+        gen::populateWithSphera(&sphera->meshes[0], 1, 16, 16);
+
+        sphera->materials.resize(2);
+        sphera->materials[0].color = glm::vec3(0.0F, 0.5F, 1.0F);
+        sphera->materials[1].color = glm::vec3(0.0F, 1.0F, 0.0F);
+
+        sphera->shapeCountFn = [] { return 3; };
+
+        sphera->populateShapesFn = [](std::vector<cmd::Shape> &shapes) {
+          for (auto &shape : shapes) {
+            shape.meshIndex      = 0;
+            shape.materialIndex  = 0;
+            shape.rotationVector = glm::vec3(0.0F, 0.0F, 0.0F);
+            shape.scale          = glm::vec3(1.0F, 1.0F, 1.0F);
+          }
+
+          shapes[0].position = glm::vec3(0.0F, 0.0F, 0.0F);
+          shapes[1].position = glm::vec3(2.0F, 0.0F, 0.0F);
+          shapes[2].position = glm::vec3(0.0F, 2.0F, 0.0F);
+
+          shapes[1].materialIndex = 1;
+        };
+
+        ret->sequence.push_back(sphera);
+      }
       return ret;
     }
 

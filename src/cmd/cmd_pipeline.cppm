@@ -1,6 +1,8 @@
 module;
 
 #include <functional>
+#include <glm/fwd.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <glm/vec3.hpp>
 #include <memory>
 #include <string>
@@ -44,23 +46,69 @@ export namespace cmd {
   };
 
   /**
-   * Information for one shape
+   * Describes a single shape instance to be rendered.
+   *
+   * The system renders the mesh specified by `meshIndex`.
+   *
+   * The mesh is transformed in the following order:
+   *  1. Scaled by `scale`.
+   *  2. Rotated using the quaternion derived from `rotation`.
+   *  3. Translated by `position`.
+   *
+   * The resulting shape is then rendered using the material
+   * specified by `materialIndex`.
    */
   struct Shape
   {
-    // Index of mesh from field `CmdPipeline_ShapeGroup_Materials.meshes`
+    /**
+     * Index of mesh from field `CmdSetPipeline_ShapeGroup.meshes`
+     */
     uint32_t meshIndex;
 
-    // Moves the mesh to the specified position
+    /**
+     * Moves the mesh to the specified position
+     */
     glm::vec3 position;
 
-    // Scaling along the corresponding axes. 1 - no scaling, 0<s<1 - decrease, s>1 - increase.
-    float scaleX, scaleY, scaleZ;
+    /**
+     * Scaling along the corresponding axes.
+     *
+     * `scale.x` - sale along axis Ox.
+     *
+     * `scale.y` - sale along axis Oy.
+     *
+     * `scale.z` - sale along axis Oz.
+     *
+     * `S = 1` - no scaling, `0 < S < 1` - decrease, `S > 1` - increase.
+     *
+     * where S is one of scale.x, scale.y, scale.z
+     */
+    glm::vec3 scale;
 
-    // Rotation angles in degrees around the corresponding axes. Used in the ZYX sequence.
-    float rotateZ, rotateY, rotateX;
+    /**
+     * Rotation vector (Exponential Map) for rotate the shape.
+     *
+     * The direction of this vector is axis of rotation.
+     * The length of this vector - is angle in radians
+     *
+     * To calculate quaternion:
+     * <code>
+     * float angle = glm::length(rotationVector);
+     * if (angle < 1e-6f)
+     *     Q = glm::quat(1,0,0,0);
+     * else {
+     *     glm::vec3 axis = rotationVector / angle;
+     *     Q = glm::angleAxis(angle, axis);
+     * }
+     * </code>
+     *
+     * Q - is the quaternion for rotation.
+     */
+    glm::vec3 rotationVector;
 
-    // index of material from field `CmdPipeline_ShapeGroup_Materials.materials`
+    /**
+     * Index of material from field `CmdSetPipeline_ShapeGroup.materials`
+     */
     uint32_t materialIndex;
   };
 
