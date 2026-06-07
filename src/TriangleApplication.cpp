@@ -2,6 +2,7 @@
 module;
 
 #include <SDL3/SDL.h>
+#include <glm/vec3.hpp>
 
 #include <format>
 #include <functional>
@@ -10,6 +11,7 @@ module;
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 module triangle_application;
 
@@ -36,7 +38,12 @@ namespace app {
 
   struct PipelineVk_ShapeGroup : PipelineVk
   {
-    // TODO store here all what you need for draw this ShapeGroup pipeline
+    std::vector<cmd::Mesh>     meshes;
+    std::vector<cmd::Material> materials;
+
+    std::function<size_t()>                         shapeCountFn;
+    std::function<void(std::vector<cmd::Shape> &)> populateShapesFn;
+    std::vector<cmd::Shape>                         shapes;
   };
 
   // TODO let it be pure abstract class
@@ -47,7 +54,9 @@ namespace app {
 
   struct LightVk_Sun : LightVk
   {
-    // TODO store here all what you need for use light of Sun in pipelines
+    float     force = 1.0F;
+    glm::vec3 direction{0.0F, 0.0F, -1.0F};
+    glm::vec3 color{1.0F, 1.0F, 1.0F};
   };
 
   struct TriangleApplication::Impl
@@ -134,6 +143,8 @@ namespace app {
         }
 
         executeAllCommands();
+        updatePipelineRuntimeData();
+        uploadPipelineRuntimeData();
 
         vulkan_.drawFrame(framebufferResized_);
       }
@@ -163,6 +174,51 @@ namespace app {
       }
     }
 
+    void updatePipelineRuntimeData()
+    {
+      for (const std::string &pipelineId : pipeline_ids_) {
+        const auto pipelineIter = pipeline_map_.find(pipelineId);
+        if (pipelineIter == pipeline_map_.end()) continue;
+
+        auto *shapeGroup = dynamic_cast<PipelineVk_ShapeGroup *>(pipelineIter->second.get());
+        if (shapeGroup == nullptr || !shapeGroup->shapeCountFn) continue;
+
+        const size_t shapeCount = shapeGroup->shapeCountFn();
+        if (shapeGroup->shapes.size() != shapeCount) {
+          shapeGroup->shapes.resize(shapeCount);
+        }
+        if (shapeGroup->populateShapesFn) {
+          shapeGroup->populateShapesFn(shapeGroup->shapes);
+        }
+      }
+    }
+
+    void uploadPipelineRuntimeData()
+    {
+      std::vector<cmd::Mesh>  meshes;
+      std::vector<cmd::Shape> shapes;
+
+      for (const std::string &pipelineId : pipeline_ids_) {
+        const auto pipelineIter = pipeline_map_.find(pipelineId);
+        if (pipelineIter == pipeline_map_.end()) continue;
+
+        auto *shapeGroup = dynamic_cast<PipelineVk_ShapeGroup *>(pipelineIter->second.get());
+        if (shapeGroup == nullptr) continue;
+
+        const uint32_t meshOffset = static_cast<uint32_t>(meshes.size());
+        meshes.insert(meshes.end(), shapeGroup->meshes.begin(), shapeGroup->meshes.end());
+
+        for (cmd::Shape shape : shapeGroup->shapes) {
+          shape.meshIndex += meshOffset;
+          shapes.push_back(shape);
+        }
+      }
+
+      if (!shapes.empty()) {
+        vulkan_.setShapeGroupData(meshes, shapes);
+      }
+    }
+
     // ReSharper disable once CppPassValueParameterByConstReference
     void execute_Cmd(const cmd::CmdPtr cmdPtr)
     {
@@ -180,6 +236,10 @@ namespace app {
       }
       if (const auto command = std::dynamic_pointer_cast<cmd::CmdSetLight_Sun>(cmdPtr)) {
         execute_CmdSetLight_Sun(command);
+        return;
+      }
+      if (const auto command = std::dynamic_pointer_cast<cmd::CmdChangeCamera>(cmdPtr)) {
+        execute_CmdChangeCamera(command);
         return;
       }
       if (const auto command = std::dynamic_pointer_cast<cmd::CmdSequence>(cmdPtr)) {
@@ -206,19 +266,63 @@ namespace app {
 
     void execute_CmdPipeline_ShapeGroup(const std::shared_ptr<cmd::CmdSetPipeline_ShapeGroup> cmdPtr)
     {
-      // TODO Implement here command to add pipeline to draw ShapeGroup.
-      // TODO pipeline stored in map: `this->pipeline_map_`
-      // TODO pipelines must be draw in sequence of `this->pipeline_ids_`
+      if (cmdPtr->id.empty()) {
+        throw std::invalid_argument("yQ5nC8vLrB :: pipeline id must not be empty");
+      }
 
-      // TODO here you need initialize pipeline and put all parameters for pipeline in struct `PipelineVk_ShapeGroup` and put it to
-      // TODO `this->pipeline_ids_`
+      const bool isNewPipeline = !pipeline_map_.contains(cmdPtr->id);
+
+      auto pipeline              = std::make_unique<PipelineVk_ShapeGroup>();
+      pipeline->meshes           = cmdPtr->meshes;
+      pipeline->materials        = cmdPtr->materials;
+      pipeline->shapeCountFn     = cmdPtr->shapeCountFn;
+      pipeline->populateShapesFn = cmdPtr->populateShapesFn;
+
+      pipeline_map_[cmdPtr->id] = std::move(pipeline);
+
+      if (isNewPipeline) {
+        pipeline_ids_.push_back(cmdPtr->id);
+      }
     }
 
     void execute_CmdSetLight_Sun(const std::shared_ptr<cmd::CmdSetLight_Sun> cmdPtr)
     {
-      // TODO Implement here command to add light of Sun.
-      // TODO light stored in map: `this->light_map_`
-      // TODO lights must be draw in sequence of `this->light_ids_`
+      if (cmdPtr->id.empty()) {
+        throw std::invalid_argument("wB7tP2mXsK :: light id must not be empty");
+      }
+
+      const bool isNewLight = !light_map_.contains(cmdPtr->id);
+
+      auto sun       = std::make_unique<LightVk_Sun>();
+      sun->force     = cmdPtr->force;
+      sun->direction = cmdPtr->direction;
+      sun->color     = cmdPtr->color;
+
+      std::unique_ptr<LightVk> light = std::move(sun);
+      light_map_[cmdPtr->id]        = std::move(light);
+
+      if (isNewLight) {
+        light_ids_.push_back(cmdPtr->id);
+      }
+    }
+
+    void execute_CmdChangeCamera(const std::shared_ptr<cmd::CmdChangeCamera> cmdPtr)
+    {
+      if (cmdPtr->positionApply) {
+        vulkan_.setCameraPosition(cmdPtr->position);
+      }
+      if (cmdPtr->forwardApply) {
+        vulkan_.setCameraForward(cmdPtr->forward);
+      }
+      if (cmdPtr->upApply) {
+        vulkan_.setCameraUp(cmdPtr->up);
+      }
+      if (cmdPtr->planesApply) {
+        vulkan_.setCameraPlanes(cmdPtr->planes.near, cmdPtr->planes.far);
+      }
+      if (cmdPtr->fovDegreesApply) {
+        vulkan_.setCameraFovDegrees(cmdPtr->fovDegrees);
+      }
     }
   };
 

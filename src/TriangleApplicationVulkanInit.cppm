@@ -8,6 +8,7 @@ module;
 #include <SDL3/SDL_vulkan.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <shaderc/shaderc.hpp>
 #include <vulkan/vulkan.h>
 
@@ -28,6 +29,7 @@ module;
 export module triangle_application_vulkan_init;
 
 import utils;
+import cmd_pipeline;
 
 namespace app {
 
@@ -94,7 +96,7 @@ namespace app {
       Vertex{{-0.5F, 0.5F, 0.0F}},
   };
 
-  constexpr std::array<uint16_t, 3> kTriangleIndices = {
+  constexpr std::array<uint32_t, 3> kTriangleIndices = {
       0,
       1,
       2,
@@ -125,6 +127,12 @@ namespace app {
   {
   public:
     void setWindow(SDL_Window *window);
+    void setCameraPosition(glm::vec3 position);
+    void setCameraForward(glm::vec3 forward);
+    void setCameraUp(glm::vec3 up);
+    void setCameraPlanes(float nearPlane, float farPlane);
+    void setCameraFovDegrees(float fovDegrees);
+    void setShapeGroupData(const std::vector<cmd::Mesh> &meshes, const std::vector<cmd::Shape> &shapes);
     void waitIdle() const;
     void cleanup();
     void drawFrame(bool &framebufferResized);
@@ -188,6 +196,8 @@ namespace app {
     VkBuffer indexBuffer_              = VK_NULL_HANDLE;
     // Память Vulkan для index buffer.
     VkDeviceMemory indexBufferMemory_  = VK_NULL_HANDLE;
+    std::vector<Vertex>   vertices_{kTriangleVertices.begin(), kTriangleVertices.end()};
+    std::vector<uint32_t> indices_{kTriangleIndices.begin(), kTriangleIndices.end()};
 
     // Пул командных буферов Vulkan.
     VkCommandPool commandPool_ = VK_NULL_HANDLE;
@@ -201,6 +211,12 @@ namespace app {
     // Fences Vulkan для кадров в полете.
     std::vector<VkFence> inFlightFences_;
     uint32_t          currentFrame_ = 0;
+    glm::vec3 cameraPosition_{0.0F, 0.0F, 2.0F};
+    glm::vec3 cameraForward_{0.0F, 0.0F, -1.0F};
+    glm::vec3 cameraUp_{0.0F, 1.0F, 0.0F};
+    float     cameraNearPlane_  = 0.1F;
+    float     cameraFarPlane_   = 10.0F;
+    float     cameraFovDegrees_ = 45.0F;
     TransformMatrices transforms_{
         .model      = glm::mat4(1.0F),
         .view       = glm::lookAt(glm::vec3(0.0F, 0.0F, 2.0F), glm::vec3(0.0F, 0.0F, 0.0F), glm::vec3(0.0F, 1.0F, 0.0F)),
@@ -224,6 +240,8 @@ namespace app {
                       VkBuffer                   &buffer,
                       VkDeviceMemory             &bufferMemory) const;
     void uploadBufferData(const VkDeviceMemory bufferMemory, const void *source, const VkDeviceSize size) const;
+    void destroyGeometryBuffers();
+    void recreateGeometryBuffers();
     void recordCommandBuffer(const VkCommandBuffer commandBuffer, const uint32_t imageIndex) const;
     void recreateSwapChain();
     void cleanupSwapChain();
@@ -270,6 +288,103 @@ namespace app {
   void VulkanInit::setWindow(SDL_Window *window)
   {
     window_ = window;
+  }
+
+  void VulkanInit::setCameraPosition(const glm::vec3 position)
+  {
+    cameraPosition_ = position;
+    updateTransformMatrices();
+  }
+
+  void VulkanInit::setCameraForward(const glm::vec3 forward)
+  {
+    if (glm::dot(forward, forward) <= 0.0F) {
+      throw std::invalid_argument("fV3sW9nAeQ :: camera forward vector must be non-zero");
+    }
+    cameraForward_ = glm::normalize(forward);
+    updateTransformMatrices();
+  }
+
+  void VulkanInit::setCameraUp(const glm::vec3 up)
+  {
+    if (glm::dot(up, up) <= 0.0F) {
+      throw std::invalid_argument("qJ8mR2cLpD :: camera up vector must be non-zero");
+    }
+
+    const glm::vec3 forward = glm::normalize(cameraForward_);
+    const glm::vec3 planarUp = up - glm::dot(up, forward) * forward;
+    if (glm::dot(planarUp, planarUp) <= 0.0F) {
+      throw std::invalid_argument("nY6kT4vBxH :: camera up vector must not be parallel to forward vector");
+    }
+
+    cameraUp_ = glm::normalize(planarUp);
+    updateTransformMatrices();
+  }
+
+  void VulkanInit::setCameraPlanes(const float nearPlane, const float farPlane)
+  {
+    if (nearPlane <= 0.0F || farPlane <= nearPlane) {
+      throw std::invalid_argument("zD9pH5wKuM :: invalid camera clipping planes");
+    }
+    cameraNearPlane_ = nearPlane;
+    cameraFarPlane_  = farPlane;
+    updateTransformMatrices();
+  }
+
+  void VulkanInit::setCameraFovDegrees(const float fovDegrees)
+  {
+    if (fovDegrees <= 0.0F || fovDegrees >= 180.0F) {
+      throw std::invalid_argument("pC2rL7xNsV :: camera fovDegrees must be between 0 and 180");
+    }
+    cameraFovDegrees_ = fovDegrees;
+    updateTransformMatrices();
+  }
+
+  void VulkanInit::setShapeGroupData(const std::vector<cmd::Mesh> &meshes, const std::vector<cmd::Shape> &shapes)
+  {
+    std::vector<Vertex>   nextVertices;
+    std::vector<uint32_t> nextIndices;
+
+    size_t vertexCount = 0;
+    size_t indexCount  = 0;
+    for (const cmd::Shape &shape : shapes) {
+      if (shape.meshIndex >= meshes.size()) {
+        throw std::out_of_range("sR4cN8vQpL :: shape meshIndex is out of range");
+      }
+      vertexCount += meshes[shape.meshIndex].points.size();
+      indexCount += meshes[shape.meshIndex].triangles.size() * 3U;
+    }
+
+    nextVertices.reserve(vertexCount);
+    nextIndices.reserve(indexCount);
+
+    for (const cmd::Shape &shape : shapes) {
+      const cmd::Mesh &mesh = meshes[shape.meshIndex];
+
+      const float angle = glm::length(shape.rotationVector);
+      const glm::quat rotation =
+          angle <= 0.000001F ? glm::quat(1.0F, 0.0F, 0.0F, 0.0F) : glm::angleAxis(angle, shape.rotationVector / angle);
+      const glm::mat4 model =
+          glm::translate(glm::mat4(1.0F), shape.position) * glm::mat4_cast(rotation) * glm::scale(glm::mat4(1.0F), shape.scale);
+
+      const uint32_t baseVertex = static_cast<uint32_t>(nextVertices.size());
+      for (const glm::vec3 &point : mesh.points) {
+        nextVertices.push_back(Vertex{glm::vec3(model * glm::vec4(point, 1.0F))});
+      }
+
+      for (const cmd::TriangleIdx &triangle : mesh.triangles) {
+        if (triangle.index0 >= mesh.points.size() || triangle.index1 >= mesh.points.size() || triangle.index2 >= mesh.points.size()) {
+          throw std::out_of_range("uX9mD2bKhT :: triangle vertex index is out of range");
+        }
+        nextIndices.push_back(baseVertex + triangle.index0);
+        nextIndices.push_back(baseVertex + triangle.index1);
+        nextIndices.push_back(baseVertex + triangle.index2);
+      }
+    }
+
+    vertices_ = std::move(nextVertices);
+    indices_  = std::move(nextIndices);
+    recreateGeometryBuffers();
   }
 
   void VulkanInit::createInstance()
@@ -527,10 +642,10 @@ namespace app {
   void VulkanInit::updateTransformMatrices()
   {
     transforms_.model = glm::mat4(1.0F);
-    transforms_.view  = glm::lookAt(glm::vec3(0.0F, 0.0F, 2.0F), glm::vec3(0.0F, 0.0F, 0.0F), glm::vec3(0.0F, 1.0F, 0.0F));
+    transforms_.view  = glm::lookAt(cameraPosition_, cameraPosition_ + cameraForward_, cameraUp_);
   
     const float aspect     = static_cast<float>(swapChainExtent_.width) / static_cast<float>(swapChainExtent_.height);
-    transforms_.projection = glm::perspective(glm::radians(45.0F), aspect, 0.1F, 10.0F);
+    transforms_.projection = glm::perspective(glm::radians(cameraFovDegrees_), aspect, cameraNearPlane_, cameraFarPlane_);
     transforms_.projection[1][1] *= -1.0F;
     pushConstants_.model      = transforms_.model;
     pushConstants_.view       = transforms_.view;
@@ -942,28 +1057,59 @@ namespace app {
     vkUnmapMemory(device_, bufferMemory);
   }
 
+  void VulkanInit::destroyGeometryBuffers()
+  {
+    if (indexBuffer_ != VK_NULL_HANDLE) {
+      vkDestroyBuffer(device_, indexBuffer_, nullptr);
+      indexBuffer_ = VK_NULL_HANDLE;
+    }
+    if (indexBufferMemory_ != VK_NULL_HANDLE) {
+      vkFreeMemory(device_, indexBufferMemory_, nullptr);
+      indexBufferMemory_ = VK_NULL_HANDLE;
+    }
+    if (vertexBuffer_ != VK_NULL_HANDLE) {
+      vkDestroyBuffer(device_, vertexBuffer_, nullptr);
+      vertexBuffer_ = VK_NULL_HANDLE;
+    }
+    if (vertexBufferMemory_ != VK_NULL_HANDLE) {
+      vkFreeMemory(device_, vertexBufferMemory_, nullptr);
+      vertexBufferMemory_ = VK_NULL_HANDLE;
+    }
+  }
+
+  void VulkanInit::recreateGeometryBuffers()
+  {
+    if (device_ == VK_NULL_HANDLE) return;
+    vkDeviceWaitIdle(device_);
+    destroyGeometryBuffers();
+    createVertexBuffer();
+    createIndexBuffer();
+  }
+
   void VulkanInit::createVertexBuffer()
   {
-    // Размер vertex buffer Vulkan.
-    constexpr VkDeviceSize bufferSize = sizeof(kTriangleVertices[0]) * kTriangleVertices.size();
+    if (vertices_.empty()) return;
+
+    const VkDeviceSize bufferSize = sizeof(vertices_[0]) * vertices_.size();
     createBuffer(bufferSize,
                  VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                  vertexBuffer_,
                  vertexBufferMemory_);
-    uploadBufferData(vertexBufferMemory_, kTriangleVertices.data(), bufferSize);
+    uploadBufferData(vertexBufferMemory_, vertices_.data(), bufferSize);
   }
 
   void VulkanInit::createIndexBuffer()
   {
-    // Размер index buffer Vulkan.
-    constexpr VkDeviceSize bufferSize = sizeof(kTriangleIndices[0]) * kTriangleIndices.size();
+    if (indices_.empty()) return;
+
+    const VkDeviceSize bufferSize = sizeof(indices_[0]) * indices_.size();
     createBuffer(bufferSize,
                  VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
                  VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                  indexBuffer_,
                  indexBufferMemory_);
-    uploadBufferData(indexBufferMemory_, kTriangleIndices.data(), bufferSize);
+    uploadBufferData(indexBufferMemory_, indices_.data(), bufferSize);
   }
 
   void VulkanInit::createCommandBuffers()
@@ -1011,6 +1157,14 @@ namespace app {
     vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
     // Привязываем графический pipeline Vulkan.
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
+
+    if (vertexBuffer_ == VK_NULL_HANDLE || indexBuffer_ == VK_NULL_HANDLE || indices_.empty()) {
+      vkCmdEndRenderPass(commandBuffer);
+      if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
+        throw std::runtime_error("wJ4tK6mPxV :: failed to record command buffer");
+      }
+      return;
+    }
   
     // Vertex buffer Vulkan для привязки к pipeline.
     const VkBuffer vertexBuffers[]   = {vertexBuffer_};
@@ -1019,11 +1173,11 @@ namespace app {
     // Привязываем vertex buffer Vulkan.
     vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
     // Привязываем index buffer Vulkan.
-    vkCmdBindIndexBuffer(commandBuffer, indexBuffer_, 0, VK_INDEX_TYPE_UINT16);
+    vkCmdBindIndexBuffer(commandBuffer, indexBuffer_, 0, VK_INDEX_TYPE_UINT32);
     // Передаем матрицы трансформации в push constants Vulkan.
     vkCmdPushConstants(commandBuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstants), &pushConstants_);
     // Отправляем индексированную команду рисования Vulkan.
-    vkCmdDrawIndexed(commandBuffer, kTriangleIndices.size(), 1, 0, 0, 0);
+    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices_.size()), 1, 0, 0, 0);
     // Завершаем render pass Vulkan.
     vkCmdEndRenderPass(commandBuffer);
   
@@ -1086,14 +1240,7 @@ namespace app {
       vkDestroyFence(device_, inFlightFences_[i], nullptr);
     }
 
-    // Уничтожаем index buffer Vulkan.
-    vkDestroyBuffer(device_, indexBuffer_, nullptr);
-    // Освобождаем память Vulkan для index buffer.
-    vkFreeMemory(device_, indexBufferMemory_, nullptr);
-    // Уничтожаем vertex buffer Vulkan.
-    vkDestroyBuffer(device_, vertexBuffer_, nullptr);
-    // Освобождаем память Vulkan для vertex buffer.
-    vkFreeMemory(device_, vertexBufferMemory_, nullptr);
+    destroyGeometryBuffers();
 
     // Уничтожаем пул команд Vulkan.
     vkDestroyCommandPool(device_, commandPool_, nullptr);

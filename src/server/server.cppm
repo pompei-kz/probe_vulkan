@@ -9,6 +9,7 @@ export module server;
 import cmd;
 import utils;
 import cmd_pipeline;
+import cmd_light;
 import generator;
 
 export namespace server {
@@ -38,6 +39,16 @@ export namespace server {
         camera->fovDegreesApply = true;
 
         ret->sequence.push_back(camera);
+      }
+
+      {
+        const auto sun = std::make_shared<cmd::CmdSetLight_Sun>();
+        sun->id        = "a9Kp2nVqL4";
+        sun->force     = 1.0F;
+        sun->direction = glm::vec3(-0.25F, -0.5F, -1.0F);
+        sun->color     = glm::vec3(1.0F, 1.0F, 0.95F);
+
+        ret->sequence.push_back(sun);
       }
 
       {
