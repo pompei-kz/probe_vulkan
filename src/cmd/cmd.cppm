@@ -22,6 +22,12 @@ export namespace cmd {
     std::string message;
   };
 
+  struct CmdSequence : Cmd
+  {
+    bool                sync = true;
+    std::vector<CmdPtr> sequence;
+  };
+
   // This command changes camera parameters.
   // Each parameter has boolean flag
   struct CmdChangeCamera : Cmd

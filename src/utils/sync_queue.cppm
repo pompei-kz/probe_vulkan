@@ -19,19 +19,19 @@ export namespace sync {
     std::queue<Element>       data_;
 
   public:
-    void push(const Element &value)
+    void push_back(const Element &value)
     {
       std::unique_lock lock(mutex_);
       data_.push(value);
     }
 
-    void push(Element &&value)
+    void push_back(Element &&value)
     {
       std::unique_lock lock(mutex_);
       data_.push(std::move(value));
     }
 
-    [[nodiscard]] std::optional<Element> pop()
+    [[nodiscard]] std::optional<Element> pop_front()
     {
       std::unique_lock lock(mutex_);
 

@@ -19,7 +19,7 @@ export namespace app {
     TriangleApplication(const TriangleApplication &)            = delete;
     TriangleApplication &operator=(const TriangleApplication &) = delete;
 
-    void run(cmd::CmdFactory startCmdGetter);
+    void run(const cmd::CmdFactory &&startCmdGetter);
 
   private:
     struct Impl;

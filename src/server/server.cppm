@@ -6,7 +6,7 @@ module;
 export module server;
 import cmd;
 import utils;
-import pipeline;
+import cmd_pipeline;
 
 export namespace server {
   /// Bean server
@@ -17,8 +17,9 @@ export namespace server {
   public:
     cmd::CmdPtr start()
     {
-      auto ret = std::make_shared<cmd::CmdPipeline_ShapeGroup_Materials>();
-      ret->id  = "fp7c4pmXp1 :: super  pipeline";
+      auto ret = std::make_shared<cmd::CmdSetPipeline_ShapeGroup>();
+      ret->id  = "fp7c4pmXp1";
+
       return ret;
     }
 
