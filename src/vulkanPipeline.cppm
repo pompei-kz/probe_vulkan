@@ -6,6 +6,7 @@ module;
 #include <shaderc/shaderc.hpp>
 #include <vulkan/vulkan.h>
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <cstring>
@@ -197,6 +198,238 @@ namespace app::vulkan_pipeline {
     std::memcpy(data, source, size);
     // Завершаем отображение памяти Vulkan.
     vkUnmapMemory(device, bufferMemory);
+  }
+
+  // Создает один слот кольцевого буфера и постоянно отображает его память в адресное пространство CPU.
+  export void createRingSlot(const VkDevice           device,
+                             const VkPhysicalDevice   physicalDevice,
+                             model::RingSlot         &slot,
+                             const VkDeviceSize       size,
+                             const VkBufferUsageFlags usage,
+                             const uint32_t           capacity)
+  {
+    createBuffer(device,
+                 physicalDevice,
+                 size,
+                 usage,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 slot.buffer,
+                 slot.memory);
+    if (vkMapMemory(device, slot.memory, 0, size, 0, &slot.mapped) != VK_SUCCESS) {
+      throw std::runtime_error("xR4nT9mLqW :: failed to map ring slot memory");
+    }
+    slot.capacity = capacity;
+  }
+
+  // Уничтожает слот кольцевого буфера: снимает отображение, удаляет buffer и освобождает память.
+  export void destroyRingSlot(const VkDevice device, model::RingSlot &slot)
+  {
+    if (slot.mapped != nullptr) {
+      vkUnmapMemory(device, slot.memory);
+      slot.mapped = nullptr;
+    }
+    if (slot.buffer != VK_NULL_HANDLE) {
+      vkDestroyBuffer(device, slot.buffer, nullptr);
+      slot.buffer = VK_NULL_HANDLE;
+    }
+    if (slot.memory != VK_NULL_HANDLE) {
+      vkFreeMemory(device, slot.memory, nullptr);
+      slot.memory = VK_NULL_HANDLE;
+    }
+    slot.capacity = 0;
+  }
+
+  // Создает и заполняет статический буфер материалов pipeline.
+  export void createMaterialBuffer(const VkDevice device, const VkPhysicalDevice physicalDevice, model::PipelineVk_ShapeGroup &pipeline)
+  {
+    std::vector<model::MaterialGpu> materials;
+    materials.reserve(std::max<size_t>(1, pipeline.materials.size()));
+    for (const cmd::Material &material : pipeline.materials) {
+      materials.push_back(model::MaterialGpu{glm::vec4(material.color, 1.0F)});
+    }
+    // Буфер не может быть нулевого размера, поэтому держим хотя бы один материал по умолчанию.
+    if (materials.empty()) {
+      materials.push_back(model::MaterialGpu{glm::vec4(1.0F, 1.0F, 1.0F, 1.0F)});
+    }
+
+    const VkDeviceSize bufferSize = sizeof(model::MaterialGpu) * materials.size();
+    createBuffer(device,
+                 physicalDevice,
+                 bufferSize,
+                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 pipeline.gpu.materialBuffer,
+                 pipeline.gpu.materialMemory);
+    uploadBufferData(device, pipeline.gpu.materialMemory, materials.data(), bufferSize);
+  }
+
+  // Создает descriptor pool и descriptor set материалов (set 1) для pipeline.
+  export void createPipelineDescriptorSet(const VkDevice device, const VkDescriptorSetLayout materialSetLayout, model::PipelineVk_ShapeGroup &pipeline)
+  {
+    VkDescriptorPoolSize poolSize{};
+    poolSize.type            = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    poolSize.descriptorCount = 1;
+
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = 1;
+    poolInfo.pPoolSizes    = &poolSize;
+    poolInfo.maxSets       = 1;
+
+    if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &pipeline.gpu.descriptorPool) != VK_SUCCESS) {
+      throw std::runtime_error("tB6vN2mKwQ :: failed to create pipeline descriptor pool");
+    }
+
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool     = pipeline.gpu.descriptorPool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts        = &materialSetLayout;
+
+    if (vkAllocateDescriptorSets(device, &allocInfo, &pipeline.gpu.materialSet) != VK_SUCCESS) {
+      throw std::runtime_error("rM9cV4nLpT :: failed to allocate material descriptor set");
+    }
+
+    VkDescriptorBufferInfo bufferInfo{};
+    bufferInfo.buffer = pipeline.gpu.materialBuffer;
+    bufferInfo.offset = 0;
+    bufferInfo.range  = VK_WHOLE_SIZE;
+
+    VkWriteDescriptorSet write{};
+    write.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet          = pipeline.gpu.materialSet;
+    write.dstBinding      = 0;
+    write.descriptorCount = 1;
+    write.descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    write.pBufferInfo     = &bufferInfo;
+
+    vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
+  }
+
+  // Создает все статические Vulkan ресурсы pipeline (один раз при регистрации).
+  export void createPipeline(const VkDevice              device,
+                             const VkPhysicalDevice      physicalDevice,
+                             const VkDescriptorSetLayout materialSetLayout,
+                             model::PipelineVk_ShapeGroup &pipeline)
+  {
+    if (device == VK_NULL_HANDLE) return;
+
+    // Статические vertex/index буферы мешей создаются один раз.
+    model::GeometryData geometry = buildStaticMesh(pipeline.meshes);
+    pipeline.gpu.meshRanges      = geometry.meshRanges;
+
+    if (!geometry.vertices.empty()) {
+      const VkDeviceSize bufferSize = sizeof(model::Vertex) * geometry.vertices.size();
+      createBuffer(device,
+                   physicalDevice,
+                   bufferSize,
+                   VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                   pipeline.gpu.vertexBuffer,
+                   pipeline.gpu.vertexMemory);
+      uploadBufferData(device, pipeline.gpu.vertexMemory, geometry.vertices.data(), bufferSize);
+    }
+    if (!geometry.indices.empty()) {
+      const VkDeviceSize bufferSize = sizeof(uint32_t) * geometry.indices.size();
+      createBuffer(device,
+                   physicalDevice,
+                   bufferSize,
+                   VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                   pipeline.gpu.indexBuffer,
+                   pipeline.gpu.indexMemory);
+      uploadBufferData(device, pipeline.gpu.indexMemory, geometry.indices.data(), bufferSize);
+    }
+
+    // Статический буфер материалов и его descriptor set.
+    createMaterialBuffer(device, physicalDevice, pipeline);
+    createPipelineDescriptorSet(device, materialSetLayout, pipeline);
+
+    // Кольцо динамических буферов инстансов (по одному на кадр в полете).
+    uint32_t initialCapacity = 16;
+    if (pipeline.shapeCountFn) {
+      initialCapacity = std::max<uint32_t>(initialCapacity, static_cast<uint32_t>(pipeline.shapeCountFn()));
+    }
+    for (model::RingSlot &slot : pipeline.gpu.instanceRing) {
+      createRingSlot(device, physicalDevice, slot, sizeof(model::InstanceData) * initialCapacity, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, initialCapacity);
+    }
+  }
+
+  // Уничтожает все Vulkan ресурсы pipeline (при удалении или замене).
+  export void destroyPipeline(const VkDevice device, model::PipelineVk_ShapeGroup &pipeline)
+  {
+    if (device == VK_NULL_HANDLE) return;
+
+    // Замена/удаление pipeline происходит редко, поэтому полная остановка устройства допустима.
+    vkDeviceWaitIdle(device);
+
+    for (model::RingSlot &slot : pipeline.gpu.instanceRing) {
+      destroyRingSlot(device, slot);
+    }
+
+    if (pipeline.gpu.descriptorPool != VK_NULL_HANDLE) {
+      vkDestroyDescriptorPool(device, pipeline.gpu.descriptorPool, nullptr);
+      pipeline.gpu.descriptorPool = VK_NULL_HANDLE;
+      pipeline.gpu.materialSet    = VK_NULL_HANDLE;
+    }
+    if (pipeline.gpu.materialBuffer != VK_NULL_HANDLE) {
+      vkDestroyBuffer(device, pipeline.gpu.materialBuffer, nullptr);
+      pipeline.gpu.materialBuffer = VK_NULL_HANDLE;
+    }
+    if (pipeline.gpu.materialMemory != VK_NULL_HANDLE) {
+      vkFreeMemory(device, pipeline.gpu.materialMemory, nullptr);
+      pipeline.gpu.materialMemory = VK_NULL_HANDLE;
+    }
+    if (pipeline.gpu.indexBuffer != VK_NULL_HANDLE) {
+      vkDestroyBuffer(device, pipeline.gpu.indexBuffer, nullptr);
+      pipeline.gpu.indexBuffer = VK_NULL_HANDLE;
+    }
+    if (pipeline.gpu.indexMemory != VK_NULL_HANDLE) {
+      vkFreeMemory(device, pipeline.gpu.indexMemory, nullptr);
+      pipeline.gpu.indexMemory = VK_NULL_HANDLE;
+    }
+    if (pipeline.gpu.vertexBuffer != VK_NULL_HANDLE) {
+      vkDestroyBuffer(device, pipeline.gpu.vertexBuffer, nullptr);
+      pipeline.gpu.vertexBuffer = VK_NULL_HANDLE;
+    }
+    if (pipeline.gpu.vertexMemory != VK_NULL_HANDLE) {
+      vkFreeMemory(device, pipeline.gpu.vertexMemory, nullptr);
+      pipeline.gpu.vertexMemory = VK_NULL_HANDLE;
+    }
+
+    pipeline.gpu.meshRanges.clear();
+    pipeline.gpu.drawBatches.clear();
+  }
+
+  // Гарантирует, что слот инстансов текущего кадра вмещает не менее `count` инстансов.
+  void ensureInstanceCapacity(const VkDevice               device,
+                              const VkPhysicalDevice       physicalDevice,
+                              model::PipelineVk_ShapeGroup &pipeline,
+                              const uint32_t               frame,
+                              const uint32_t               count)
+  {
+    model::RingSlot &slot = pipeline.gpu.instanceRing[frame];
+    if (count <= slot.capacity) {
+      return;
+    }
+    // Растем с запасом, чтобы не пересоздавать буфер каждый кадр.
+    const uint32_t newCapacity = std::max(count, slot.capacity * 2);
+    destroyRingSlot(device, slot);
+    createRingSlot(device, physicalDevice, slot, sizeof(model::InstanceData) * newCapacity, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, newCapacity);
+  }
+
+  // Группирует shapes по мешам и записывает данные инстансов в буфер текущего кадра.
+  export void updateInstanceData(const VkDevice device, const VkPhysicalDevice physicalDevice, model::PipelineVk_ShapeGroup &pipeline, const uint32_t frame)
+  {
+    const uint32_t count = static_cast<uint32_t>(pipeline.shapes.size());
+    ensureInstanceCapacity(device, physicalDevice, pipeline, frame, count);
+
+    model::RingSlot &slot    = pipeline.gpu.instanceRing[frame];
+    pipeline.gpu.drawBatches = groupShapes(pipeline.shapes,
+                                           pipeline.gpu.meshRanges,
+                                           static_cast<model::InstanceData *>(slot.mapped),
+                                           slot.capacity,
+                                           static_cast<uint32_t>(pipeline.materials.size()));
   }
 
   // Создает descriptor set layout для света (set 0) и материалов (set 1).

@@ -104,8 +104,8 @@ namespace app {
     {
       bool quit = false;
       while (!quit) {
+
         SDL_Event event{};
-        // Забираем следующее событие из очереди SDL.
         while (SDL_PollEvent(&event) != 0) {
           if (event.type == SDL_EVENT_QUIT) {
             quit = true;
