@@ -42,6 +42,20 @@ namespace app {
       VK_KHR_SWAPCHAIN_EXTENSION_NAME,
   };
 
+  std::vector<model::Vertex> defaultVertices()
+  {
+    return {
+        model::Vertex{{0.0F, -0.5F, 0.0F}, {0.0F, 0.0F, 1.0F}, {0.0F, 0.25F, 1.0F}},
+        model::Vertex{{0.5F, 0.5F, 0.0F}, {0.0F, 0.0F, 1.0F}, {0.0F, 0.25F, 1.0F}},
+        model::Vertex{{-0.5F, 0.5F, 0.0F}, {0.0F, 0.0F, 1.0F}, {0.0F, 0.25F, 1.0F}},
+    };
+  }
+
+  std::vector<uint32_t> defaultIndices()
+  {
+    return {0, 1, 2};
+  }
+
   export class VulkanInit
   {
   public:
@@ -55,10 +69,8 @@ namespace app {
     void setPipelineDescriptors(const std::vector<model::VulkanPipelineDescriptors *> &pipelineDescriptors);
     void createPipelineDescriptors(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
     void destroyPipelineDescriptors(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
-    void setShapeGroupData(const std::vector<cmd::Mesh>     &meshes,
-                           const std::vector<cmd::Material> &materials,
-                           const std::vector<cmd::Shape>    &shapes);
-    void setShapeGroupData(model::VulkanPipelineDescriptors  &pipelineDescriptors,
+    void setShapeGroupData(const std::vector<cmd::Mesh> &meshes, const std::vector<cmd::Material> &materials, const std::vector<cmd::Shape> &shapes);
+    void setShapeGroupData(model::VulkanPipelineDescriptors &pipelineDescriptors,
                            const std::vector<cmd::Mesh>     &meshes,
                            const std::vector<cmd::Material> &materials,
                            const std::vector<cmd::Shape>    &shapes) const;
@@ -118,15 +130,15 @@ namespace app {
     VkPipeline graphicsPipeline_     = VK_NULL_HANDLE;
 
     // Vertex buffer Vulkan с позициями треугольника.
-    VkBuffer vertexBuffer_             = VK_NULL_HANDLE;
+    VkBuffer vertexBuffer_                                             = VK_NULL_HANDLE;
     // Память Vulkan для vertex buffer.
-    VkDeviceMemory vertexBufferMemory_ = VK_NULL_HANDLE;
+    VkDeviceMemory vertexBufferMemory_                                 = VK_NULL_HANDLE;
     // Index buffer Vulkan с индексами треугольника.
-    VkBuffer indexBuffer_              = VK_NULL_HANDLE;
+    VkBuffer indexBuffer_                                              = VK_NULL_HANDLE;
     // Память Vulkan для index buffer.
-    VkDeviceMemory indexBufferMemory_  = VK_NULL_HANDLE;
-    std::vector<Vertex>   vertices_{vulkan_pipeline::defaultVertices()};
-    std::vector<uint32_t> indices_{vulkan_pipeline::defaultIndices()};
+    VkDeviceMemory                                  indexBufferMemory_ = VK_NULL_HANDLE;
+    std::vector<model::Vertex>                      vertices_{defaultVertices()};
+    std::vector<uint32_t>                           indices_{defaultIndices()};
     std::vector<model::VulkanPipelineDescriptors *> pipelineDescriptors_;
 
     // Пул командных буферов Vulkan.
@@ -139,47 +151,47 @@ namespace app {
     // Semaphores Vulkan для завершения рендера.
     std::vector<VkSemaphore> renderFinishedSemaphores_;
     // Fences Vulkan для кадров в полете.
-    std::vector<VkFence> inFlightFences_;
-    uint32_t          currentFrame_ = 0;
-    glm::vec3 cameraPosition_{0.0F, 0.0F, 2.0F};
-    glm::vec3 cameraForward_{0.0F, 0.0F, -1.0F};
-    glm::vec3 cameraUp_{0.0F, 1.0F, 0.0F};
-    float     cameraNearPlane_  = 0.1F;
-    float     cameraFarPlane_   = 10.0F;
-    float     cameraFovDegrees_ = 45.0F;
+    std::vector<VkFence>     inFlightFences_;
+    uint32_t                 currentFrame_ = 0;
+    glm::vec3                cameraPosition_{0.0F, 0.0F, 2.0F};
+    glm::vec3                cameraForward_{0.0F, 0.0F, -1.0F};
+    glm::vec3                cameraUp_{0.0F, 1.0F, 0.0F};
+    float                    cameraNearPlane_  = 0.1F;
+    float                    cameraFarPlane_   = 10.0F;
+    float                    cameraFovDegrees_ = 45.0F;
     model::TransformMatrices transforms_{
         .model      = glm::mat4(1.0F),
         .view       = glm::lookAt(glm::vec3(0.0F, 0.0F, 2.0F), glm::vec3(0.0F, 0.0F, 0.0F), glm::vec3(0.0F, 1.0F, 0.0F)),
         .projection = glm::perspective(glm::radians(45.0F), static_cast<float>(WINDOW_WIDTH) / static_cast<float>(WINDOW_HEIGHT), 0.1F, 10.0F),
     };
-    PushConstants pushConstants_{};
+    model::PushConstants pushConstants_{};
 
-    bool isDeviceSuitable(const VkPhysicalDevice device) const;
-    static bool checkDeviceExtensionSupport(const VkPhysicalDevice device);
+    bool                      isDeviceSuitable(const VkPhysicalDevice device) const;
+    static bool               checkDeviceExtensionSupport(const VkPhysicalDevice device);
     model::QueueFamilyIndices findQueueFamilies(const VkPhysicalDevice device) const;
-    model::SwapChainSupport querySwapChainSupport(const VkPhysicalDevice device) const;
+    model::SwapChainSupport   querySwapChainSupport(const VkPhysicalDevice device) const;
     static VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &formats);
-    static VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR> &presentModes);
-    [[nodiscard]] VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities) const;
-    void updateTransformMatrices();
-    [[nodiscard]] uint32_t findMemoryType(const uint32_t typeFilter, const VkMemoryPropertyFlags properties) const;
-    void createBuffer(const VkDeviceSize          size,
-                      const VkBufferUsageFlags    usage,
-                      const VkMemoryPropertyFlags properties,
-                      VkBuffer                   &buffer,
-                      VkDeviceMemory             &bufferMemory) const;
-    void uploadBufferData(const VkDeviceMemory bufferMemory, const void *source, const VkDeviceSize size) const;
-    void destroyGeometryBuffers();
-    void recreateGeometryBuffers();
-    void createPipelineGraphicsObjects(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
-    void destroyPipelineGraphicsObjects(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
-    void destroyPipelineGeometryBuffers(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
-    void recreatePipelineGeometryBuffers(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
-    void createPipelineVertexBuffer(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
-    void createPipelineIndexBuffer(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
-    void recordCommandBuffer(const VkCommandBuffer commandBuffer, const uint32_t imageIndex) const;
-    void recreateSwapChain();
-    void cleanupSwapChain();
+    static VkPresentModeKHR   chooseSwapPresentMode(const std::vector<VkPresentModeKHR> &presentModes);
+    [[nodiscard]] VkExtent2D  chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities) const;
+    void                      updateTransformMatrices();
+    [[nodiscard]] uint32_t    findMemoryType(const uint32_t typeFilter, const VkMemoryPropertyFlags properties) const;
+    void                      createBuffer(const VkDeviceSize          size,
+                                           const VkBufferUsageFlags    usage,
+                                           const VkMemoryPropertyFlags properties,
+                                           VkBuffer                   &buffer,
+                                           VkDeviceMemory             &bufferMemory) const;
+    void                      uploadBufferData(const VkDeviceMemory bufferMemory, const void *source, const VkDeviceSize size) const;
+    void                      destroyGeometryBuffers();
+    void                      recreateGeometryBuffers();
+    void                      createPipelineGraphicsObjects(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
+    void                      destroyPipelineGraphicsObjects(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
+    void                      destroyPipelineGeometryBuffers(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
+    void                      recreatePipelineGeometryBuffers(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
+    void                      createPipelineVertexBuffer(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
+    void                      createPipelineIndexBuffer(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
+    void                      recordCommandBuffer(const VkCommandBuffer commandBuffer, const uint32_t imageIndex) const;
+    void                      recreateSwapChain();
+    void                      cleanupSwapChain();
   };
 
 } // namespace app
@@ -212,7 +224,7 @@ namespace app {
       throw std::invalid_argument("qJ8mR2cLpD :: camera up vector must be non-zero");
     }
 
-    const glm::vec3 forward = glm::normalize(cameraForward_);
+    const glm::vec3 forward  = glm::normalize(cameraForward_);
     const glm::vec3 planarUp = up - glm::dot(up, forward) * forward;
     if (glm::dot(planarUp, planarUp) <= 0.0F) {
       throw std::invalid_argument("nY6kT4vBxH :: camera up vector must not be parallel to forward vector");
@@ -272,18 +284,18 @@ namespace app {
                                      const std::vector<cmd::Material> &materials,
                                      const std::vector<cmd::Shape>    &shapes)
   {
-    GeometryData geometry = vulkan_pipeline::buildShapeGroupGeometry(meshes, materials, shapes);
-    vertices_             = std::move(geometry.vertices);
-    indices_              = std::move(geometry.indices);
+    model::GeometryData geometry = vulkan_pipeline::buildShapeGroupGeometry(meshes, materials, shapes);
+    vertices_                    = std::move(geometry.vertices);
+    indices_                     = std::move(geometry.indices);
     recreateGeometryBuffers();
   }
 
-  void VulkanInit::setShapeGroupData(model::VulkanPipelineDescriptors  &pipelineDescriptors,
+  void VulkanInit::setShapeGroupData(model::VulkanPipelineDescriptors &pipelineDescriptors,
                                      const std::vector<cmd::Mesh>     &meshes,
                                      const std::vector<cmd::Material> &materials,
                                      const std::vector<cmd::Shape>    &shapes) const
   {
-    GeometryData geometry        = vulkan_pipeline::buildShapeGroupGeometry(meshes, materials, shapes);
+    model::GeometryData geometry = vulkan_pipeline::buildShapeGroupGeometry(meshes, materials, shapes);
     pipelineDescriptors.vertices = std::move(geometry.vertices);
     pipelineDescriptors.indices  = std::move(geometry.indices);
     recreatePipelineGeometryBuffers(pipelineDescriptors);
@@ -299,7 +311,7 @@ namespace app {
     appInfo.pEngineName        = "No Engine";                        // Имя движка, если он используется.
     appInfo.engineVersion      = VK_MAKE_VERSION(1, 0, 0);           // Версия движка.
     appInfo.apiVersion         = VK_API_VERSION_1_0;                 // Минимальная версия Vulkan API для приложения.
-  
+
     Uint32 extensionCount         = 0;
     // Получаем список расширений Vulkan, которые нужны SDL.
     const char *const *extensions = SDL_Vulkan_GetInstanceExtensions(&extensionCount);
@@ -307,14 +319,14 @@ namespace app {
       // Получаем текст ошибки SDL.
       throw std::runtime_error(std::string("hM4cV7nLxS :: ") + SDL_GetError());
     }
-  
+
     // Параметры создания экземпляра Vulkan.
     VkInstanceCreateInfo createInfo{};
     createInfo.sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO; // Тип структуры создания экземпляра Vulkan.
     createInfo.pApplicationInfo        = &appInfo;                               // Указатель на описание приложения.
     createInfo.enabledExtensionCount   = extensionCount;                         // Количество включаемых расширений экземпляра.
     createInfo.ppEnabledExtensionNames = extensions;                             // Имена расширений экземпляра, нужных SDL.
-  
+
     // Создаем экземпляр Vulkan.
     if (vkCreateInstance(&createInfo, nullptr, &instance_) != VK_SUCCESS) {
       throw std::runtime_error("uF2dK8wYpC :: failed to create Vulkan instance");
@@ -338,19 +350,19 @@ namespace app {
     if (deviceCount == 0) {
       throw std::runtime_error("bL3xS9eRwD :: failed to find GPUs with Vulkan support");
     }
-  
+
     // Список физических устройств Vulkan.
     std::vector<VkPhysicalDevice> devices(deviceCount);
     // Получаем список физических устройств Vulkan.
     vkEnumeratePhysicalDevices(instance_, &deviceCount, devices.data());
-  
+
     for (const VkPhysicalDevice &device : devices) {
       if (isDeviceSuitable(device)) {
         physicalDevice_ = device;
         break;
       }
     }
-  
+
     if (physicalDevice_ == VK_NULL_HANDLE) {
       throw std::runtime_error("ZGNjrNDGyX :: failed to find a suitable GPU");
     }
@@ -358,15 +370,15 @@ namespace app {
 
   bool VulkanInit::isDeviceSuitable(const VkPhysicalDevice device) const
   {
-    const model::QueueFamilyIndices indices      = findQueueFamilies(device);
-    const bool               extensionsSupported = checkDeviceExtensionSupport(device);
-    bool                     swapChainAdequate   = false;
-  
+    const model::QueueFamilyIndices indices             = findQueueFamilies(device);
+    const bool                      extensionsSupported = checkDeviceExtensionSupport(device);
+    bool                            swapChainAdequate   = false;
+
     if (extensionsSupported) {
       const model::SwapChainSupport swapChainSupport = querySwapChainSupport(device);
-      swapChainAdequate                       = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
+      swapChainAdequate                              = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
     }
-  
+
     return indices.complete() && extensionsSupported && swapChainAdequate;
   }
 
@@ -375,39 +387,39 @@ namespace app {
     uint32_t extensionCount = 0;
     // Запрашиваем количество расширений устройства Vulkan.
     vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
-  
+
     // Список доступных расширений устройства Vulkan.
     std::vector<VkExtensionProperties> availableExtensions(extensionCount);
     // Получаем список расширений устройства Vulkan.
     vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, availableExtensions.data());
-  
+
     std::set<std::string> requiredExtensions(kDeviceExtensions.begin(), kDeviceExtensions.end());
     // ReSharper disable once CppUseStructuredBinding
     for (const VkExtensionProperties &extension : availableExtensions) {
       requiredExtensions.erase(extension.extensionName);
     }
-  
+
     return requiredExtensions.empty();
   }
 
   model::QueueFamilyIndices VulkanInit::findQueueFamilies(const VkPhysicalDevice device) const
   {
     model::QueueFamilyIndices indices;
-  
+
     uint32_t queueFamilyCount = 0;
     // Запрашиваем количество семейств очередей Vulkan.
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
-  
+
     // Свойства семейств очередей Vulkan.
     std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
     // Получаем свойства семейств очередей Vulkan.
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
-  
+
     for (uint32_t i = 0; i < queueFamilies.size(); ++i) {
       if ((queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0) {
         indices.graphicsFamily = i;
       }
-  
+
       // Флаг поддержки показа через Vulkan surface.
       VkBool32 presentSupport = VK_FALSE;
       // Проверяем поддержку показа Vulkan для семейства очередей.
@@ -415,12 +427,12 @@ namespace app {
       if (presentSupport == VK_TRUE) {
         indices.presentFamily = i;
       }
-  
+
       if (indices.complete()) {
         break;
       }
     }
-  
+
     return indices;
   }
 
@@ -428,13 +440,13 @@ namespace app {
   {
     // ReSharper disable once CppUseStructuredBinding
     const model::QueueFamilyIndices indices = findQueueFamilies(physicalDevice_);
-  
+
     // Параметры очередей Vulkan для логического устройства.
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-  
+
     // ReSharper disable once CppTemplateArgumentsCanBeDeduced
     std::set<uint32_t> uniqueQueueFamilies = {*indices.graphicsFamily, *indices.presentFamily};
-  
+
     constexpr float queuePriority = 1.0F;
     for (uint32_t queueFamily : uniqueQueueFamilies) {
       // Описание очереди Vulkan для логического устройства.
@@ -445,10 +457,10 @@ namespace app {
       queueCreateInfo.pQueuePriorities = &queuePriority;                             // Приоритет очереди для планировщика устройства.
       queueCreateInfos.push_back(queueCreateInfo);
     }
-  
+
     // Набор включаемых возможностей физического устройства Vulkan.
     VkPhysicalDeviceFeatures deviceFeatures{};
-  
+
     // Параметры создания логического устройства Vulkan.
     VkDeviceCreateInfo createInfo{};
     createInfo.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;            // Тип структуры создания логического устройства.
@@ -457,12 +469,12 @@ namespace app {
     createInfo.pEnabledFeatures        = &deviceFeatures;                                 // Включаемые возможности физического устройства.
     createInfo.enabledExtensionCount   = static_cast<uint32_t>(kDeviceExtensions.size()); // Количество расширений устройства.
     createInfo.ppEnabledExtensionNames = kDeviceExtensions.data();                        // Имена включаемых расширений устройства.
-  
+
     // Создаем логическое устройство Vulkan.
     if (vkCreateDevice(physicalDevice_, &createInfo, nullptr, &device_) != VK_SUCCESS) {
       throw std::runtime_error("cY7pD4nVaR :: failed to create logical device");
     }
-  
+
     // Получаем графическую очередь Vulkan.
     vkGetDeviceQueue(device_, *indices.graphicsFamily, 0, &graphicsQueue_);
     // Получаем очередь показа Vulkan.
@@ -474,7 +486,7 @@ namespace app {
     model::SwapChainSupport details;
     // Получаем ограничения Vulkan surface для swap-chain.
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface_, &details.capabilities);
-  
+
     uint32_t formatCount = 0;
     // Запрашиваем количество форматов Vulkan surface.
     vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface_, &formatCount, nullptr);
@@ -483,7 +495,7 @@ namespace app {
       // Получаем доступные форматы Vulkan surface.
       vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface_, &formatCount, details.formats.data());
     }
-  
+
     uint32_t presentModeCount = 0;
     // Запрашиваем количество режимов показа Vulkan surface.
     vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface_, &presentModeCount, nullptr);
@@ -492,7 +504,7 @@ namespace app {
       // Получаем доступные режимы показа Vulkan surface.
       vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface_, &presentModeCount, details.presentModes.data());
     }
-  
+
     return details;
   }
 
@@ -503,7 +515,7 @@ namespace app {
         return availableFormat;
       }
     }
-  
+
     return formats[0];
   }
 
@@ -514,7 +526,7 @@ namespace app {
         return availablePresentMode;
       }
     }
-  
+
     return VK_PRESENT_MODE_FIFO_KHR;
   }
 
@@ -523,21 +535,21 @@ namespace app {
     if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
       return capabilities.currentExtent;
     }
-  
+
     int width  = 0;
     int height = 0;
-  
+
     // Получаем размер окна SDL в пикселях.
     if (!SDL_GetWindowSizeInPixels(window_, &width, &height)) {
       // Получаем текст ошибки SDL.
       throw std::runtime_error(std::string("mE9tH2wKsL :: ") + SDL_GetError());
     }
-  
+
     // Фактический размер swap-chain Vulkan.
     VkExtent2D actualExtent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
     actualExtent.width      = std::clamp(actualExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
     actualExtent.height     = std::clamp(actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
-  
+
     return actualExtent;
   }
 
@@ -545,7 +557,7 @@ namespace app {
   {
     transforms_.model = glm::mat4(1.0F);
     transforms_.view  = glm::lookAt(cameraPosition_, cameraPosition_ + cameraForward_, cameraUp_);
-  
+
     const float aspect     = static_cast<float>(swapChainExtent_.width) / static_cast<float>(swapChainExtent_.height);
     transforms_.projection = glm::perspective(glm::radians(cameraFovDegrees_), aspect, cameraNearPlane_, cameraFarPlane_);
     transforms_.projection[1][1] *= -1.0F;
@@ -558,17 +570,17 @@ namespace app {
   {
     const model::SwapChainSupport swapChainSupport = querySwapChainSupport(physicalDevice_);
     // Выбранный формат поверхности Vulkan.
-    const VkSurfaceFormatKHR surfaceFormat  = chooseSwapSurfaceFormat(swapChainSupport.formats);
+    const VkSurfaceFormatKHR surfaceFormat         = chooseSwapSurfaceFormat(swapChainSupport.formats);
     // Выбранный режим показа Vulkan.
-    const VkPresentModeKHR presentMode      = chooseSwapPresentMode(swapChainSupport.presentModes);
+    const VkPresentModeKHR presentMode             = chooseSwapPresentMode(swapChainSupport.presentModes);
     // Выбранный размер swap-chain Vulkan.
-    const VkExtent2D extent                 = chooseSwapExtent(swapChainSupport.capabilities);
-    uint32_t         imageCount             = swapChainSupport.capabilities.minImageCount + 1;
-  
+    const VkExtent2D extent                        = chooseSwapExtent(swapChainSupport.capabilities);
+    uint32_t         imageCount                    = swapChainSupport.capabilities.minImageCount + 1;
+
     if (swapChainSupport.capabilities.maxImageCount > 0 && imageCount > swapChainSupport.capabilities.maxImageCount) {
       imageCount = swapChainSupport.capabilities.maxImageCount;
     }
-  
+
     // Параметры создания swap-chain Vulkan.
     VkSwapchainCreateInfoKHR createInfo{};
     createInfo.sType            = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR; // Тип структуры создания swap-chain.
@@ -579,10 +591,10 @@ namespace app {
     createInfo.imageExtent      = extent;                                      // Размер изображений swap-chain в пикселях.
     createInfo.imageArrayLayers = 1;                                           // Количество слоев изображения, для обычного 2D окна нужен один.
     createInfo.imageUsage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;         // Изображения будут использоваться как color attachment.
-  
-    const model::QueueFamilyIndices indices       = findQueueFamilies(physicalDevice_);
-    const uint32_t           queueFamilyIndices[] = {*indices.graphicsFamily, *indices.presentFamily};
-  
+
+    const model::QueueFamilyIndices indices              = findQueueFamilies(physicalDevice_);
+    const uint32_t                  queueFamilyIndices[] = {*indices.graphicsFamily, *indices.presentFamily};
+
     if (indices.graphicsFamily != indices.presentFamily) {
       createInfo.imageSharingMode      = VK_SHARING_MODE_CONCURRENT; // Изображения доступны нескольким семействам очередей.
       createInfo.queueFamilyIndexCount = 2;                          // Количество семейств очередей, которым нужен доступ.
@@ -590,24 +602,24 @@ namespace app {
     } else {
       createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE; // Изображения принадлежат одному семейству очередей.
     }
-  
+
     createInfo.preTransform   = swapChainSupport.capabilities.currentTransform; // Текущее преобразование surface перед показом.
     createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;              // Альфа-канал окна не смешивается с другими окнами.
     createInfo.presentMode    = presentMode;                                    // Режим показа изображений на экран.
     createInfo.clipped        = VK_TRUE;                                        // Разрешаем не рисовать скрытые части окна.
     createInfo.oldSwapchain   = VK_NULL_HANDLE;                                 // Старый swap-chain отсутствует при первом создании.
-  
+
     // Создаем swap-chain Vulkan.
     if (vkCreateSwapchainKHR(device_, &createInfo, nullptr, &swapChain_) != VK_SUCCESS) {
       throw std::runtime_error("xV5qN8cTpJ :: failed to create swap chain");
     }
-  
+
     // Запрашиваем количество изображений swap-chain Vulkan.
     vkGetSwapchainImagesKHR(device_, swapChain_, &imageCount, nullptr);
     swapChainImages_.resize(imageCount);
     // Получаем изображения swap-chain Vulkan.
     vkGetSwapchainImagesKHR(device_, swapChain_, &imageCount, swapChainImages_.data());
-  
+
     swapChainImageFormat_ = surfaceFormat.format;
     swapChainExtent_      = extent;
     updateTransformMatrices();
@@ -616,7 +628,7 @@ namespace app {
   void VulkanInit::createImageViews()
   {
     swapChainImageViews_.resize(swapChainImages_.size());
-  
+
     for (size_t i = 0; i < swapChainImages_.size(); ++i) {
       // Параметры создания image view Vulkan.
       VkImageViewCreateInfo createInfo{};
@@ -633,7 +645,7 @@ namespace app {
       createInfo.subresourceRange.levelCount     = 1;                                        // Количество mip levels в view.
       createInfo.subresourceRange.baseArrayLayer = 0;                                        // Первый слой массива изображений.
       createInfo.subresourceRange.layerCount     = 1;                                        // Количество слоев изображения в view.
-  
+
       // Создаем image view Vulkan для изображения swap-chain.
       if (vkCreateImageView(device_, &createInfo, nullptr, &swapChainImageViews_[i]) != VK_SUCCESS) {
         throw std::runtime_error("rB1mF6zQeW :: failed to create image views");
@@ -653,18 +665,18 @@ namespace app {
     colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // Stencil-данные не используются, их сохранение не важно.
     colorAttachment.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;        // Предыдущее содержимое изображения не нужно.
     colorAttachment.finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;  // После render pass изображение готово к показу.
-  
+
     // Ссылка на цветовой attachment Vulkan.
     VkAttachmentReference colorAttachmentRef{};
     colorAttachmentRef.attachment = 0;                                        // Индекс color attachment в массиве render pass attachments.
     colorAttachmentRef.layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; // Layout attachment во время цветового рендеринга.
-  
+
     // Описание subpass Vulkan.
     VkSubpassDescription subpass{};
     subpass.pipelineBindPoint    = VK_PIPELINE_BIND_POINT_GRAPHICS; // Subpass используется графическим pipeline.
     subpass.colorAttachmentCount = 1;                               // В subpass используется один color attachment.
     subpass.pColorAttachments    = &colorAttachmentRef;             // Ссылка на color attachment для вывода fragment shader.
-  
+
     // Зависимость subpass Vulkan для синхронизации.
     VkSubpassDependency dependency{};
     dependency.srcSubpass    = VK_SUBPASS_EXTERNAL;                           // Источник зависимости находится вне render pass.
@@ -672,7 +684,7 @@ namespace app {
     dependency.srcStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT; // Ждем стадии вывода color attachment снаружи.
     dependency.dstStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT; // Синхронизируемся перед стадией вывода color attachment.
     dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;          // Разрешаем запись в color attachment после ожидания.
-  
+
     // Параметры создания render pass Vulkan.
     VkRenderPassCreateInfo renderPassInfo{};
     renderPassInfo.sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO; // Тип структуры создания render pass.
@@ -682,7 +694,7 @@ namespace app {
     renderPassInfo.pSubpasses      = &subpass;                                  // Описание subpass.
     renderPassInfo.dependencyCount = 1;                                         // Количество зависимостей subpass.
     renderPassInfo.pDependencies   = &dependency;                               // Описание синхронизации subpass.
-  
+
     // Создаем render pass Vulkan.
     if (vkCreateRenderPass(device_, &renderPassInfo, nullptr, &renderPass_) != VK_SUCCESS) {
       throw std::runtime_error("nK8sP3yLdM :: failed to create render pass");
@@ -697,11 +709,11 @@ namespace app {
   void VulkanInit::createFramebuffers()
   {
     swapChainFramebuffers_.resize(swapChainImageViews_.size());
-  
+
     for (size_t i = 0; i < swapChainImageViews_.size(); ++i) {
       // Attachment framebuffer Vulkan.
       const VkImageView attachments[] = {swapChainImageViews_[i]};
-  
+
       // Параметры создания framebuffer Vulkan.
       VkFramebufferCreateInfo framebufferInfo{};
       framebufferInfo.sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO; // Тип структуры создания framebuffer.
@@ -711,7 +723,7 @@ namespace app {
       framebufferInfo.width           = swapChainExtent_.width;                    // Ширина framebuffer.
       framebufferInfo.height          = swapChainExtent_.height;                   // Высота framebuffer.
       framebufferInfo.layers          = 1;                                         // Количество слоев framebuffer.
-  
+
       // Создаем framebuffer Vulkan.
       if (vkCreateFramebuffer(device_, &framebufferInfo, nullptr, &swapChainFramebuffers_[i]) != VK_SUCCESS) {
         throw std::runtime_error("tH3wX8cJpQ :: failed to create framebuffer");
@@ -722,13 +734,13 @@ namespace app {
   void VulkanInit::createCommandPool()
   {
     const model::QueueFamilyIndices queueFamilyIndices = findQueueFamilies(physicalDevice_);
-  
+
     // Параметры создания command pool Vulkan.
     VkCommandPoolCreateInfo poolInfo{};
     poolInfo.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;      // Тип структуры создания command pool.
     poolInfo.flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT; // Разрешаем сбрасывать command buffers по отдельности.
     poolInfo.queueFamilyIndex = *queueFamilyIndices.graphicsFamily;              // Семейство очередей, для которого создается command pool.
-  
+
     // Создаем command pool Vulkan.
     if (vkCreateCommandPool(device_, &poolInfo, nullptr, &commandPool_) != VK_SUCCESS) {
       throw std::runtime_error("sM7nD1vKgR :: failed to create command pool");
@@ -741,22 +753,22 @@ namespace app {
     VkPhysicalDeviceMemoryProperties memoryProperties{};
     // Получаем свойства памяти физического устройства Vulkan.
     vkGetPhysicalDeviceMemoryProperties(physicalDevice_, &memoryProperties);
-  
+
     for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; ++i) {
       // ReSharper disable once CppRedundantParentheses
       if ((typeFilter & (1 << i)) != 0 && (memoryProperties.memoryTypes[i].propertyFlags & properties) == properties) {
         return i;
       }
     }
-  
+
     throw std::runtime_error("mR7cQ2vLpN :: failed to find suitable Vulkan memory type");
   }
 
   void VulkanInit::createBuffer(const VkDeviceSize          size,
-                    const VkBufferUsageFlags    usage,
-                    const VkMemoryPropertyFlags properties,
-                    VkBuffer                   &buffer,
-                    VkDeviceMemory             &bufferMemory) const
+                                const VkBufferUsageFlags    usage,
+                                const VkMemoryPropertyFlags properties,
+                                VkBuffer                   &buffer,
+                                VkDeviceMemory             &bufferMemory) const
   {
     // Параметры создания buffer Vulkan.
     VkBufferCreateInfo bufferInfo{};
@@ -764,28 +776,28 @@ namespace app {
     bufferInfo.size        = size;                                 // Размер buffer в байтах.
     bufferInfo.usage       = usage;                                // Назначение buffer: vertex, index или другое.
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;            // Buffer используется одним семейством очередей.
-  
+
     // Создаем buffer Vulkan.
     if (vkCreateBuffer(device_, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
       throw std::runtime_error("zP4hT8nVqS :: failed to create Vulkan buffer");
     }
-  
+
     // Требования памяти Vulkan для buffer.
     VkMemoryRequirements memoryRequirements{};
     // Получаем требования памяти Vulkan для buffer.
     vkGetBufferMemoryRequirements(device_, buffer, &memoryRequirements);
-  
+
     // Параметры выделения памяти Vulkan.
     VkMemoryAllocateInfo allocInfo{};
     allocInfo.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;                        // Тип структуры выделения памяти.
     allocInfo.allocationSize  = memoryRequirements.size;                                       // Размер выделяемой памяти.
     allocInfo.memoryTypeIndex = findMemoryType(memoryRequirements.memoryTypeBits, properties); // Индекс подходящего типа памяти.
-  
+
     // Выделяем память Vulkan для buffer.
     if (vkAllocateMemory(device_, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
       throw std::runtime_error("vN9xD3kWsE :: failed to allocate Vulkan buffer memory");
     }
-  
+
     // Привязываем память Vulkan к buffer.
     if (vkBindBufferMemory(device_, buffer, bufferMemory, 0) != VK_SUCCESS) {
       throw std::runtime_error("qF6sL1xRcM :: failed to bind Vulkan buffer memory");
@@ -940,14 +952,14 @@ namespace app {
   void VulkanInit::createCommandBuffers()
   {
     commandBuffers_.resize(MAX_FRAMES_IN_FLIGHT);
-  
+
     // Параметры выделения command buffers Vulkan.
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO; // Тип структуры выделения command buffers.
     allocInfo.commandPool        = commandPool_;                                   // Command pool, из которого выделяются command buffers.
     allocInfo.level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY;                // Primary command buffers можно отправлять в очередь напрямую.
     allocInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers_.size());  // Количество выделяемых command buffers.
-  
+
     // Выделяем command buffers Vulkan.
     if (vkAllocateCommandBuffers(device_, &allocInfo, commandBuffers_.data()) != VK_SUCCESS) {
       throw std::runtime_error("vC2pL9yWtF :: failed to allocate command buffers");
@@ -956,9 +968,9 @@ namespace app {
 
   void VulkanInit::recordCommandBuffer(const VkCommandBuffer commandBuffer, const uint32_t imageIndex) const
   {
-    std::vector<PipelineDrawData> pipelineDraws;
+    std::vector<model::PipelineDrawData> pipelineDraws;
     pipelineDraws.reserve(1 + pipelineDescriptors_.size());
-    pipelineDraws.push_back(PipelineDrawData{
+    pipelineDraws.push_back(model::PipelineDrawData{
         .graphicsPipeline = graphicsPipeline_,
         .vertexBuffer     = vertexBuffer_,
         .indexBuffer      = indexBuffer_,
@@ -969,7 +981,7 @@ namespace app {
     for (const model::VulkanPipelineDescriptors *pipelineDescriptors : pipelineDescriptors_) {
       if (pipelineDescriptors == nullptr) continue;
 
-      pipelineDraws.push_back(PipelineDrawData{
+      pipelineDraws.push_back(model::PipelineDrawData{
           .graphicsPipeline = pipelineDescriptors->graphicsPipeline,
           .vertexBuffer     = pipelineDescriptors->vertexBuffer,
           .indexBuffer      = pipelineDescriptors->indexBuffer,
@@ -992,34 +1004,33 @@ namespace app {
     imageAvailableSemaphores_.resize(MAX_FRAMES_IN_FLIGHT);
     renderFinishedSemaphores_.resize(MAX_FRAMES_IN_FLIGHT);
     inFlightFences_.resize(MAX_FRAMES_IN_FLIGHT);
-  
+
     // Параметры создания semaphore Vulkan.
     VkSemaphoreCreateInfo semaphoreInfo{};
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO; // Тип структуры создания semaphore.
-  
+
     // Параметры создания fence Vulkan.
     VkFenceCreateInfo fenceInfo{};
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO; // Тип структуры создания fence.
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;        // Fence создается уже signaled, чтобы первый кадр не завис.
-  
+
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
       // Создаем semaphore Vulkan для ожидания изображения.
       if (vkCreateSemaphore(device_, &semaphoreInfo, nullptr, &imageAvailableSemaphores_[i]) != VK_SUCCESS) {
         throw std::runtime_error("eR8sB2qNyT :: failed to create image-available semaphore");
       }
-  
+
       // Создаем semaphore Vulkan для ожидания завершения рендера.
       if (vkCreateSemaphore(device_, &semaphoreInfo, nullptr, &renderFinishedSemaphores_[i]) != VK_SUCCESS) {
         throw std::runtime_error("lD5vH9cWmK :: failed to create render-finished semaphore");
       }
-  
+
       // Создаем fence Vulkan для кадра.
       if (vkCreateFence(device_, &fenceInfo, nullptr, &inFlightFences_[i]) != VK_SUCCESS) {
         throw std::runtime_error("pX1kT7zQaF :: failed to create in-flight fence");
       }
     }
   }
-
 
   void VulkanInit::waitIdle() const
   {
