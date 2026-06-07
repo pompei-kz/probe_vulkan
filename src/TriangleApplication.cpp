@@ -5,7 +5,6 @@ module;
 #include <glm/vec3.hpp>
 
 #include <format>
-#include <functional>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -24,40 +23,12 @@ import sync_map;
 import sync_linked_list;
 import triangle_application_vulkan_init;
 import cmd_pipeline;
+import model;
 
 namespace app {
 
   constexpr int WINDOW_WIDTH  = 800;
   constexpr int WINDOW_HEIGHT = 600;
-
-  // TODO let it be pure abstract class
-  struct PipelineVk
-  {
-    virtual ~PipelineVk() = default;
-
-    VulkanPipelineDescriptors descriptors;
-  };
-
-  struct PipelineVk_ShapeGroup : PipelineVk
-  {
-    std::vector<cmd::Mesh>                         meshes;
-    std::vector<cmd::Material>                     materials;
-    std::function<size_t()>                        shapeCountFn;
-    std::function<void(std::vector<cmd::Shape> &)> populateShapesFn;
-    std::vector<cmd::Shape>                        shapes;
-  };
-
-  struct LightVk
-  {
-    virtual ~LightVk() = default;
-  };
-
-  struct LightVk_Sun : LightVk
-  {
-    float     force = 1.0F;
-    glm::vec3 direction{0.0F, 0.0F, -1.0F};
-    glm::vec3 color{1.0F, 1.0F, 1.0F};
-  };
 
   struct TriangleApplication::Impl
   {
@@ -67,12 +38,12 @@ namespace app {
     getter::Getter<Settings> &setting_;
 
     // TODO use this map to draw pipelines in Vulkan
-    std::unordered_map<std::string, std::unique_ptr<PipelineVk>> pipeline_map_;
-    std::vector<std::string>                                     pipeline_ids_; // TODO in this oder use pipelines
+    std::unordered_map<std::string, std::unique_ptr<model::PipelineVk>> pipeline_map_;
+    std::vector<std::string>                                           pipeline_ids_; // TODO in this oder use pipelines
 
     // TODO use this map to use lights in Vulkan
-    std::unordered_map<std::string, std::unique_ptr<LightVk>> light_map_;
-    std::vector<std::string>                                  light_ids_; // TODO in this oder use lights
+    std::unordered_map<std::string, std::unique_ptr<model::LightVk>> light_map_;
+    std::vector<std::string>                                        light_ids_; // TODO in this oder use lights
 
     sync::SyncQueue<cmd::CmdPtr> commands_;
 
@@ -180,7 +151,7 @@ namespace app {
         const auto pipelineIter = pipeline_map_.find(pipelineId);
         if (pipelineIter == pipeline_map_.end()) continue;
 
-        auto *shapeGroup = dynamic_cast<PipelineVk_ShapeGroup *>(pipelineIter->second.get());
+        auto *shapeGroup = dynamic_cast<model::PipelineVk_ShapeGroup *>(pipelineIter->second.get());
         if (shapeGroup == nullptr || !shapeGroup->shapeCountFn) continue;
 
         const size_t shapeCount = shapeGroup->shapeCountFn();
@@ -195,14 +166,14 @@ namespace app {
 
     void uploadPipelineRuntimeData()
     {
-      std::vector<VulkanPipelineDescriptors *> pipelineDescriptors;
+      std::vector<model::VulkanPipelineDescriptors *> pipelineDescriptors;
       pipelineDescriptors.reserve(pipeline_ids_.size());
 
       for (const std::string &pipelineId : pipeline_ids_) {
         const auto pipelineIter = pipeline_map_.find(pipelineId);
         if (pipelineIter == pipeline_map_.end()) continue;
 
-        auto *shapeGroup = dynamic_cast<PipelineVk_ShapeGroup *>(pipelineIter->second.get());
+        auto *shapeGroup = dynamic_cast<model::PipelineVk_ShapeGroup *>(pipelineIter->second.get());
         if (shapeGroup == nullptr) continue;
 
         vulkan_.setShapeGroupData(shapeGroup->descriptors, shapeGroup->meshes, shapeGroup->materials, shapeGroup->shapes);
@@ -266,7 +237,7 @@ namespace app {
       const auto existingPipelineIter = pipeline_map_.find(cmdPtr->id);
       const bool isNewPipeline        = existingPipelineIter == pipeline_map_.end();
 
-      auto pipeline              = std::make_unique<PipelineVk_ShapeGroup>();
+      auto pipeline              = std::make_unique<model::PipelineVk_ShapeGroup>();
       pipeline->meshes           = cmdPtr->meshes;
       pipeline->materials        = cmdPtr->materials;
       pipeline->shapeCountFn     = cmdPtr->shapeCountFn;
@@ -292,14 +263,14 @@ namespace app {
 
       const bool isNewLight = !light_map_.contains(cmdPtr->id);
 
-      auto sun       = std::make_unique<LightVk_Sun>();
+      auto sun       = std::make_unique<model::LightVk_Sun>();
       sun->force     = cmdPtr->force;
       sun->direction = cmdPtr->direction;
       sun->color     = cmdPtr->color;
 
       vulkan_.setSunLight(sun->direction, sun->color, sun->force);
 
-      std::unique_ptr<LightVk> light = std::move(sun);
+      std::unique_ptr<model::LightVk> light = std::move(sun);
       light_map_[cmdPtr->id]         = std::move(light);
 
       if (isNewLight) {

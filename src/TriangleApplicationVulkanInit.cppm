@@ -14,7 +14,6 @@ module;
 #include <cstdint>
 #include <cstring>
 #include <limits>
-#include <optional>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -25,6 +24,7 @@ export module triangle_application_vulkan_init;
 import util;
 import cmd_pipeline;
 import vulkanPipeline;
+import model;
 
 namespace app {
 
@@ -42,52 +42,6 @@ namespace app {
       VK_KHR_SWAPCHAIN_EXTENSION_NAME,
   };
 
-  struct TransformMatrices
-  {
-    glm::mat4 model;
-    glm::mat4 view;
-    glm::mat4 projection;
-  };
-
-  struct QueueFamilyIndices
-  {
-    std::optional<uint32_t> graphicsFamily;
-    std::optional<uint32_t> presentFamily;
-
-    [[nodiscard]] bool complete() const
-    {
-      return graphicsFamily.has_value() && presentFamily.has_value();
-    }
-  };
-
-  struct SwapChainSupport
-  {
-    // Храним ограничения поверхности Vulkan для выбора параметров swap-chain.
-    VkSurfaceCapabilitiesKHR capabilities{};
-    // Доступные форматы поверхности Vulkan.
-    std::vector<VkSurfaceFormatKHR> formats;
-    // Доступные режимы показа Vulkan.
-    std::vector<VkPresentModeKHR> presentModes;
-  };
-
-  export struct VulkanPipelineDescriptors
-  {
-    // Layout графического pipeline Vulkan.
-    VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
-    // Графический pipeline Vulkan.
-    VkPipeline graphicsPipeline     = VK_NULL_HANDLE;
-    // Vertex buffer Vulkan.
-    VkBuffer vertexBuffer           = VK_NULL_HANDLE;
-    // Память Vulkan для vertex buffer.
-    VkDeviceMemory vertexBufferMemory = VK_NULL_HANDLE;
-    // Index buffer Vulkan.
-    VkBuffer indexBuffer              = VK_NULL_HANDLE;
-    // Память Vulkan для index buffer.
-    VkDeviceMemory indexBufferMemory  = VK_NULL_HANDLE;
-    std::vector<Vertex>   vertices;
-    std::vector<uint32_t> indices;
-  };
-
   export class VulkanInit
   {
   public:
@@ -98,13 +52,13 @@ namespace app {
     void setCameraPlanes(float nearPlane, float farPlane);
     void setCameraFovDegrees(float fovDegrees);
     void setSunLight(glm::vec3 direction, glm::vec3 color, float force);
-    void setPipelineDescriptors(const std::vector<VulkanPipelineDescriptors *> &pipelineDescriptors);
-    void createPipelineDescriptors(VulkanPipelineDescriptors &pipelineDescriptors) const;
-    void destroyPipelineDescriptors(VulkanPipelineDescriptors &pipelineDescriptors) const;
+    void setPipelineDescriptors(const std::vector<model::VulkanPipelineDescriptors *> &pipelineDescriptors);
+    void createPipelineDescriptors(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
+    void destroyPipelineDescriptors(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
     void setShapeGroupData(const std::vector<cmd::Mesh>     &meshes,
                            const std::vector<cmd::Material> &materials,
                            const std::vector<cmd::Shape>    &shapes);
-    void setShapeGroupData(VulkanPipelineDescriptors         &pipelineDescriptors,
+    void setShapeGroupData(model::VulkanPipelineDescriptors  &pipelineDescriptors,
                            const std::vector<cmd::Mesh>     &meshes,
                            const std::vector<cmd::Material> &materials,
                            const std::vector<cmd::Shape>    &shapes) const;
@@ -173,7 +127,7 @@ namespace app {
     VkDeviceMemory indexBufferMemory_  = VK_NULL_HANDLE;
     std::vector<Vertex>   vertices_{vulkan_pipeline::defaultVertices()};
     std::vector<uint32_t> indices_{vulkan_pipeline::defaultIndices()};
-    std::vector<VulkanPipelineDescriptors *> pipelineDescriptors_;
+    std::vector<model::VulkanPipelineDescriptors *> pipelineDescriptors_;
 
     // Пул командных буферов Vulkan.
     VkCommandPool commandPool_ = VK_NULL_HANDLE;
@@ -193,7 +147,7 @@ namespace app {
     float     cameraNearPlane_  = 0.1F;
     float     cameraFarPlane_   = 10.0F;
     float     cameraFovDegrees_ = 45.0F;
-    TransformMatrices transforms_{
+    model::TransformMatrices transforms_{
         .model      = glm::mat4(1.0F),
         .view       = glm::lookAt(glm::vec3(0.0F, 0.0F, 2.0F), glm::vec3(0.0F, 0.0F, 0.0F), glm::vec3(0.0F, 1.0F, 0.0F)),
         .projection = glm::perspective(glm::radians(45.0F), static_cast<float>(WINDOW_WIDTH) / static_cast<float>(WINDOW_HEIGHT), 0.1F, 10.0F),
@@ -202,8 +156,8 @@ namespace app {
 
     bool isDeviceSuitable(const VkPhysicalDevice device) const;
     static bool checkDeviceExtensionSupport(const VkPhysicalDevice device);
-    QueueFamilyIndices findQueueFamilies(const VkPhysicalDevice device) const;
-    SwapChainSupport querySwapChainSupport(const VkPhysicalDevice device) const;
+    model::QueueFamilyIndices findQueueFamilies(const VkPhysicalDevice device) const;
+    model::SwapChainSupport querySwapChainSupport(const VkPhysicalDevice device) const;
     static VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &formats);
     static VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR> &presentModes);
     [[nodiscard]] VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities) const;
@@ -217,12 +171,12 @@ namespace app {
     void uploadBufferData(const VkDeviceMemory bufferMemory, const void *source, const VkDeviceSize size) const;
     void destroyGeometryBuffers();
     void recreateGeometryBuffers();
-    void createPipelineGraphicsObjects(VulkanPipelineDescriptors &pipelineDescriptors) const;
-    void destroyPipelineGraphicsObjects(VulkanPipelineDescriptors &pipelineDescriptors) const;
-    void destroyPipelineGeometryBuffers(VulkanPipelineDescriptors &pipelineDescriptors) const;
-    void recreatePipelineGeometryBuffers(VulkanPipelineDescriptors &pipelineDescriptors) const;
-    void createPipelineVertexBuffer(VulkanPipelineDescriptors &pipelineDescriptors) const;
-    void createPipelineIndexBuffer(VulkanPipelineDescriptors &pipelineDescriptors) const;
+    void createPipelineGraphicsObjects(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
+    void destroyPipelineGraphicsObjects(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
+    void destroyPipelineGeometryBuffers(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
+    void recreatePipelineGeometryBuffers(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
+    void createPipelineVertexBuffer(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
+    void createPipelineIndexBuffer(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
     void recordCommandBuffer(const VkCommandBuffer commandBuffer, const uint32_t imageIndex) const;
     void recreateSwapChain();
     void cleanupSwapChain();
@@ -292,18 +246,18 @@ namespace app {
     vulkan_pipeline::setSunLight(pushConstants_, direction, color, force);
   }
 
-  void VulkanInit::setPipelineDescriptors(const std::vector<VulkanPipelineDescriptors *> &pipelineDescriptors)
+  void VulkanInit::setPipelineDescriptors(const std::vector<model::VulkanPipelineDescriptors *> &pipelineDescriptors)
   {
     pipelineDescriptors_ = pipelineDescriptors;
   }
 
-  void VulkanInit::createPipelineDescriptors(VulkanPipelineDescriptors &pipelineDescriptors) const
+  void VulkanInit::createPipelineDescriptors(model::VulkanPipelineDescriptors &pipelineDescriptors) const
   {
     createPipelineGraphicsObjects(pipelineDescriptors);
     recreatePipelineGeometryBuffers(pipelineDescriptors);
   }
 
-  void VulkanInit::destroyPipelineDescriptors(VulkanPipelineDescriptors &pipelineDescriptors) const
+  void VulkanInit::destroyPipelineDescriptors(model::VulkanPipelineDescriptors &pipelineDescriptors) const
   {
     if (device_ == VK_NULL_HANDLE) return;
 
@@ -324,7 +278,7 @@ namespace app {
     recreateGeometryBuffers();
   }
 
-  void VulkanInit::setShapeGroupData(VulkanPipelineDescriptors         &pipelineDescriptors,
+  void VulkanInit::setShapeGroupData(model::VulkanPipelineDescriptors  &pipelineDescriptors,
                                      const std::vector<cmd::Mesh>     &meshes,
                                      const std::vector<cmd::Material> &materials,
                                      const std::vector<cmd::Shape>    &shapes) const
@@ -404,12 +358,12 @@ namespace app {
 
   bool VulkanInit::isDeviceSuitable(const VkPhysicalDevice device) const
   {
-    const QueueFamilyIndices indices             = findQueueFamilies(device);
+    const model::QueueFamilyIndices indices      = findQueueFamilies(device);
     const bool               extensionsSupported = checkDeviceExtensionSupport(device);
     bool                     swapChainAdequate   = false;
   
     if (extensionsSupported) {
-      const SwapChainSupport swapChainSupport = querySwapChainSupport(device);
+      const model::SwapChainSupport swapChainSupport = querySwapChainSupport(device);
       swapChainAdequate                       = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
     }
   
@@ -436,9 +390,9 @@ namespace app {
     return requiredExtensions.empty();
   }
 
-  QueueFamilyIndices VulkanInit::findQueueFamilies(const VkPhysicalDevice device) const
+  model::QueueFamilyIndices VulkanInit::findQueueFamilies(const VkPhysicalDevice device) const
   {
-    QueueFamilyIndices indices;
+    model::QueueFamilyIndices indices;
   
     uint32_t queueFamilyCount = 0;
     // Запрашиваем количество семейств очередей Vulkan.
@@ -473,7 +427,7 @@ namespace app {
   void VulkanInit::createLogicalDevice()
   {
     // ReSharper disable once CppUseStructuredBinding
-    const QueueFamilyIndices indices = findQueueFamilies(physicalDevice_);
+    const model::QueueFamilyIndices indices = findQueueFamilies(physicalDevice_);
   
     // Параметры очередей Vulkan для логического устройства.
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
@@ -515,9 +469,9 @@ namespace app {
     vkGetDeviceQueue(device_, *indices.presentFamily, 0, &presentQueue_);
   }
 
-  SwapChainSupport VulkanInit::querySwapChainSupport(const VkPhysicalDevice device) const
+  model::SwapChainSupport VulkanInit::querySwapChainSupport(const VkPhysicalDevice device) const
   {
-    SwapChainSupport details;
+    model::SwapChainSupport details;
     // Получаем ограничения Vulkan surface для swap-chain.
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface_, &details.capabilities);
   
@@ -602,7 +556,7 @@ namespace app {
 
   void VulkanInit::createSwapChain()
   {
-    const SwapChainSupport swapChainSupport = querySwapChainSupport(physicalDevice_);
+    const model::SwapChainSupport swapChainSupport = querySwapChainSupport(physicalDevice_);
     // Выбранный формат поверхности Vulkan.
     const VkSurfaceFormatKHR surfaceFormat  = chooseSwapSurfaceFormat(swapChainSupport.formats);
     // Выбранный режим показа Vulkan.
@@ -626,7 +580,7 @@ namespace app {
     createInfo.imageArrayLayers = 1;                                           // Количество слоев изображения, для обычного 2D окна нужен один.
     createInfo.imageUsage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;         // Изображения будут использоваться как color attachment.
   
-    const QueueFamilyIndices indices              = findQueueFamilies(physicalDevice_);
+    const model::QueueFamilyIndices indices       = findQueueFamilies(physicalDevice_);
     const uint32_t           queueFamilyIndices[] = {*indices.graphicsFamily, *indices.presentFamily};
   
     if (indices.graphicsFamily != indices.presentFamily) {
@@ -767,7 +721,7 @@ namespace app {
 
   void VulkanInit::createCommandPool()
   {
-    const QueueFamilyIndices queueFamilyIndices = findQueueFamilies(physicalDevice_);
+    const model::QueueFamilyIndices queueFamilyIndices = findQueueFamilies(physicalDevice_);
   
     // Параметры создания command pool Vulkan.
     VkCommandPoolCreateInfo poolInfo{};
@@ -879,7 +833,7 @@ namespace app {
     createIndexBuffer();
   }
 
-  void VulkanInit::createPipelineGraphicsObjects(VulkanPipelineDescriptors &pipelineDescriptors) const
+  void VulkanInit::createPipelineGraphicsObjects(model::VulkanPipelineDescriptors &pipelineDescriptors) const
   {
     if (device_ == VK_NULL_HANDLE || renderPass_ == VK_NULL_HANDLE) return;
 
@@ -890,7 +844,7 @@ namespace app {
                                             pipelineDescriptors.graphicsPipeline);
   }
 
-  void VulkanInit::destroyPipelineGraphicsObjects(VulkanPipelineDescriptors &pipelineDescriptors) const
+  void VulkanInit::destroyPipelineGraphicsObjects(model::VulkanPipelineDescriptors &pipelineDescriptors) const
   {
     if (pipelineDescriptors.graphicsPipeline != VK_NULL_HANDLE) {
       vkDestroyPipeline(device_, pipelineDescriptors.graphicsPipeline, nullptr);
@@ -902,7 +856,7 @@ namespace app {
     }
   }
 
-  void VulkanInit::destroyPipelineGeometryBuffers(VulkanPipelineDescriptors &pipelineDescriptors) const
+  void VulkanInit::destroyPipelineGeometryBuffers(model::VulkanPipelineDescriptors &pipelineDescriptors) const
   {
     if (pipelineDescriptors.indexBuffer != VK_NULL_HANDLE) {
       vkDestroyBuffer(device_, pipelineDescriptors.indexBuffer, nullptr);
@@ -922,7 +876,7 @@ namespace app {
     }
   }
 
-  void VulkanInit::recreatePipelineGeometryBuffers(VulkanPipelineDescriptors &pipelineDescriptors) const
+  void VulkanInit::recreatePipelineGeometryBuffers(model::VulkanPipelineDescriptors &pipelineDescriptors) const
   {
     if (device_ == VK_NULL_HANDLE) return;
     vkDeviceWaitIdle(device_);
@@ -931,7 +885,7 @@ namespace app {
     createPipelineIndexBuffer(pipelineDescriptors);
   }
 
-  void VulkanInit::createPipelineVertexBuffer(VulkanPipelineDescriptors &pipelineDescriptors) const
+  void VulkanInit::createPipelineVertexBuffer(model::VulkanPipelineDescriptors &pipelineDescriptors) const
   {
     if (pipelineDescriptors.vertices.empty()) return;
 
@@ -944,7 +898,7 @@ namespace app {
     uploadBufferData(pipelineDescriptors.vertexBufferMemory, pipelineDescriptors.vertices.data(), bufferSize);
   }
 
-  void VulkanInit::createPipelineIndexBuffer(VulkanPipelineDescriptors &pipelineDescriptors) const
+  void VulkanInit::createPipelineIndexBuffer(model::VulkanPipelineDescriptors &pipelineDescriptors) const
   {
     if (pipelineDescriptors.indices.empty()) return;
 
@@ -1012,7 +966,7 @@ namespace app {
         .pipelineLayout   = pipelineLayout_,
     });
 
-    for (const VulkanPipelineDescriptors *pipelineDescriptors : pipelineDescriptors_) {
+    for (const model::VulkanPipelineDescriptors *pipelineDescriptors : pipelineDescriptors_) {
       if (pipelineDescriptors == nullptr) continue;
 
       pipelineDraws.push_back(PipelineDrawData{
@@ -1087,7 +1041,7 @@ namespace app {
     }
 
     destroyGeometryBuffers();
-    for (VulkanPipelineDescriptors *pipelineDescriptors : pipelineDescriptors_) {
+    for (model::VulkanPipelineDescriptors *pipelineDescriptors : pipelineDescriptors_) {
       if (pipelineDescriptors == nullptr) continue;
       destroyPipelineGeometryBuffers(*pipelineDescriptors);
     }
@@ -1191,7 +1145,7 @@ namespace app {
     createImageViews();
     createRenderPass();
     createGraphicsPipeline();
-    for (VulkanPipelineDescriptors *pipelineDescriptors : pipelineDescriptors_) {
+    for (model::VulkanPipelineDescriptors *pipelineDescriptors : pipelineDescriptors_) {
       if (pipelineDescriptors == nullptr) continue;
       createPipelineGraphicsObjects(*pipelineDescriptors);
     }
@@ -1214,7 +1168,7 @@ namespace app {
     vkDestroyPipelineLayout(device_, pipelineLayout_, nullptr);
     pipelineLayout_ = VK_NULL_HANDLE;
 
-    for (VulkanPipelineDescriptors *pipelineDescriptors : pipelineDescriptors_) {
+    for (model::VulkanPipelineDescriptors *pipelineDescriptors : pipelineDescriptors_) {
       if (pipelineDescriptors == nullptr) continue;
       destroyPipelineGraphicsObjects(*pipelineDescriptors);
     }
