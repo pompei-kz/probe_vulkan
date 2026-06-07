@@ -73,3 +73,41 @@ target_link_libraries(
   SDL3::SDL3
   PkgConfig::SHADERC
 )
+
+# ---------------------------------------------------------------------------
+# Tests (GoogleTest)
+# ---------------------------------------------------------------------------
+find_package(GTest REQUIRED)
+enable_testing()
+include(GoogleTest)
+
+add_executable(probe_vulkan_tests src_tests/generator_test.cpp)
+
+# The generator module transitively depends on cmd_pipeline -> cmd -> util,
+# so those module interface units must be part of the test target as well.
+target_sources(
+  probe_vulkan_tests
+  PRIVATE
+  FILE_SET CXX_MODULES
+  FILES
+  src/utils/util.cppm
+  src/cmd/cmd.cppm
+  src/cmd/cmd_pipeline.cppm
+  src/utils/generator.cppm
+)
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 23)
+  target_compile_options(probe_vulkan_tests PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-std=c++2c>)
+endif()
+
+target_link_libraries(
+  probe_vulkan_tests
+  PRIVATE
+  GTest::gtest
+  GTest::gtest_main
+  Vulkan::Vulkan
+  SDL3::SDL3
+  PkgConfig::SHADERC
+)
+
+gtest_discover_tests(probe_vulkan_tests)
