@@ -163,7 +163,9 @@ namespace app {
     void updateLightDescriptor(uint32_t frame) const;
     void writeLightSlot(uint32_t frame);
 
-    void recordCommandBuffer(const VkCommandBuffer commandBuffer, const uint32_t imageIndex, const std::vector<model::PipelineRenderData> &renderDatas) const;
+    void recordCommandBuffer(const VkCommandBuffer                         commandBuffer,
+                             const uint32_t                                imageIndex,
+                             const std::vector<model::PipelineRenderData> &renderDatas) const;
     void recreateSwapChain();
     void cleanupSwapChain();
   };
@@ -234,6 +236,7 @@ namespace app {
     lightUploadsRemaining_ = MAX_FRAMES_IN_FLIGHT;
   }
 
+  // ReSharper disable once CppMemberFunctionMayBeConst
   void VulkanInit::createPipeline(model::PipelineVk_ShapeGroup &pipeline)
   {
     vulkan_pipeline::createPipeline(device_, physicalDevice_, materialSetLayout_, pipeline);
@@ -777,8 +780,10 @@ namespace app {
       throw std::runtime_error("kP2sT7mNwB :: failed to allocate light descriptor sets");
     }
 
-    constexpr uint32_t initialLightCapacity = 8;
     for (uint32_t frame = 0; frame < MAX_FRAMES_IN_FLIGHT; ++frame) {
+
+      constexpr uint32_t initialLightCapacity = 8;
+
       vulkan_pipeline::createRingSlot(device_,
                                       physicalDevice_,
                                       lightRing_[frame],
@@ -808,7 +813,9 @@ namespace app {
     }
   }
 
-  void VulkanInit::recordCommandBuffer(const VkCommandBuffer commandBuffer, const uint32_t imageIndex, const std::vector<model::PipelineRenderData> &renderDatas) const
+  void VulkanInit::recordCommandBuffer(const VkCommandBuffer                         commandBuffer,
+                                       const uint32_t                                imageIndex,
+                                       const std::vector<model::PipelineRenderData> &renderDatas) const
   {
     vulkan_pipeline::recordCommandBuffer(commandBuffer,
                                          imageIndex,

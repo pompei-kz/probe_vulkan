@@ -2,7 +2,10 @@
   <dictionary name="project">
     <words>
       <w>shaderc</w>
+      <w>ssbo</w>
       <w>буферы</w>
+      <w>мешам</w>
+      <w>мешей</w>
     </words>
   </dictionary>
 </component>

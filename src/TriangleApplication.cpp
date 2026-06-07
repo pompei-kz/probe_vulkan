@@ -174,8 +174,7 @@ namespace app {
         const auto lightIter = light_map_.find(lightId);
         if (lightIter == light_map_.end()) continue;
         if (const auto *sun = dynamic_cast<model::LightVk_Sun *>(lightIter->second.get())) {
-          const glm::vec3 direction =
-              glm::dot(sun->direction, sun->direction) > 0.0F ? glm::normalize(sun->direction) : glm::vec3(0.0F, 0.0F, -1.0F);
+          const glm::vec3 direction = glm::dot(sun->direction, sun->direction) > 0.0F ? glm::normalize(sun->direction) : glm::vec3(0.0F, 0.0F, -1.0F);
           lights.push_back(model::LightGpu{
               .directionType = glm::vec4(direction, 0.0F),
               .colorForce    = glm::vec4(sun->color, sun->force),
@@ -309,6 +308,7 @@ namespace app {
       std::erase(pipeline_ids_, cmdPtr->id);
     }
 
+    // ReSharper disable once CppPassValueParameterByConstReference
     void execute_CmdSetLight_Sun(const std::shared_ptr<cmd::CmdSetLight_Sun> cmdPtr)
     {
       if (cmdPtr->id.empty()) {
@@ -333,6 +333,7 @@ namespace app {
       lightsDirty_ = true;
     }
 
+    // ReSharper disable once CppPassValueParameterByConstReference
     void execute_CmdChangeCamera(const std::shared_ptr<cmd::CmdChangeCamera> cmdPtr)
     {
       if (cmdPtr->positionApply) {

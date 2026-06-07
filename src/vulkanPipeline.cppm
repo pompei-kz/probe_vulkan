@@ -1,3 +1,4 @@
+// ReSharper disable CppVariableCanBeMadeConstexpr
 module;
 
 #include <glm/glm.hpp>
@@ -8,7 +9,6 @@ module;
 
 #include <algorithm>
 #include <array>
-#include <cstdint>
 #include <cstring>
 #include <filesystem>
 #include <stdexcept>
@@ -31,14 +31,17 @@ namespace app::vulkan_pipeline {
     out.meshRanges.resize(meshes.size());
 
     for (size_t meshIndex = 0; meshIndex < meshes.size(); ++meshIndex) {
+      // ReSharper disable once CppUseStructuredBinding
       const cmd::Mesh &mesh = meshes[meshIndex];
 
       model::MeshRange range;
       range.vertexOffset = static_cast<int32_t>(out.vertices.size());
       range.firstIndex   = static_cast<uint32_t>(out.indices.size());
 
+      // ReSharper disable once CppTemplateArgumentsCanBeDeduced
       std::vector<glm::vec3> normals(mesh.points.size(), glm::vec3(0.0F, 0.0F, 0.0F));
 
+      // ReSharper disable once CppUseStructuredBinding
       for (const cmd::TriangleIdx &triangle : mesh.triangles) {
         if (triangle.index0 >= mesh.points.size() || triangle.index1 >= mesh.points.size() || triangle.index2 >= mesh.points.size()) {
           throw std::out_of_range("uX9mD2bKhT :: triangle vertex index is out of range");
@@ -61,7 +64,7 @@ namespace app::vulkan_pipeline {
         out.vertices.push_back(model::Vertex{mesh.points[pointIndex], normal});
       }
 
-      range.indexCount        = static_cast<uint32_t>(out.indices.size()) - range.firstIndex;
+      range.indexCount          = static_cast<uint32_t>(out.indices.size()) - range.firstIndex;
       out.meshRanges[meshIndex] = range;
     }
 
@@ -79,11 +82,11 @@ namespace app::vulkan_pipeline {
   // Группирует shapes по meshIndex методом подсчета (counting sort) и записывает
   // данные инстансов в `dst` так, что инстансы одного меша лежат подряд.
   // Возвращает список инстансных команд рисования (по одной на меш).
-  export std::vector<model::DrawBatch> groupShapes(const std::vector<cmd::Shape>        &shapes,
-                                                   const std::vector<model::MeshRange>  &meshRanges,
-                                                   model::InstanceData                  *dst,
-                                                   const uint32_t                        capacity,
-                                                   const uint32_t                        materialCount)
+  export std::vector<model::DrawBatch> groupShapes(const std::vector<cmd::Shape>       &shapes,
+                                                   const std::vector<model::MeshRange> &meshRanges,
+                                                   model::InstanceData                 *dst,
+                                                   const uint32_t                       capacity,
+                                                   const uint32_t                       materialCount)
   {
     const size_t meshCount = meshRanges.size();
 
@@ -118,6 +121,8 @@ namespace app::vulkan_pipeline {
       if (slot >= capacity) {
         continue; // защита от переполнения буфера
       }
+
+      // ReSharper disable once CppRedundantParentheses
       const uint32_t materialIndex = materialCount == 0 ? 0 : (shape.materialIndex < materialCount ? shape.materialIndex : materialCount - 1);
 
       model::InstanceData instance{};
@@ -243,7 +248,10 @@ namespace app::vulkan_pipeline {
   export void createMaterialBuffer(const VkDevice device, const VkPhysicalDevice physicalDevice, model::PipelineVk_ShapeGroup &pipeline)
   {
     std::vector<model::MaterialGpu> materials;
+
     materials.reserve(std::max<size_t>(1, pipeline.materials.size()));
+
+    // ReSharper disable once CppUseStructuredBinding
     for (const cmd::Material &material : pipeline.materials) {
       materials.push_back(model::MaterialGpu{glm::vec4(material.color, 1.0F)});
     }
@@ -264,7 +272,9 @@ namespace app::vulkan_pipeline {
   }
 
   // Создает descriptor pool и descriptor set материалов (set 1) для pipeline.
-  export void createPipelineDescriptorSet(const VkDevice device, const VkDescriptorSetLayout materialSetLayout, model::PipelineVk_ShapeGroup &pipeline)
+  export void createPipelineDescriptorSet(const VkDevice                device,
+                                          const VkDescriptorSetLayout   materialSetLayout,
+                                          model::PipelineVk_ShapeGroup &pipeline)
   {
     VkDescriptorPoolSize poolSize{};
     poolSize.type            = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -307,16 +317,17 @@ namespace app::vulkan_pipeline {
   }
 
   // Создает все статические Vulkan ресурсы pipeline (один раз при регистрации).
-  export void createPipeline(const VkDevice              device,
-                             const VkPhysicalDevice      physicalDevice,
-                             const VkDescriptorSetLayout materialSetLayout,
+  export void createPipeline(const VkDevice                device,
+                             const VkPhysicalDevice        physicalDevice,
+                             const VkDescriptorSetLayout   materialSetLayout,
                              model::PipelineVk_ShapeGroup &pipeline)
   {
     if (device == VK_NULL_HANDLE) return;
 
     // Статические vertex/index буферы мешей создаются один раз.
-    model::GeometryData geometry = buildStaticMesh(pipeline.meshes);
-    pipeline.gpu.meshRanges      = geometry.meshRanges;
+    // ReSharper disable once CppUseStructuredBinding
+    const model::GeometryData geometry = buildStaticMesh(pipeline.meshes);
+    pipeline.gpu.meshRanges            = geometry.meshRanges;
 
     if (!geometry.vertices.empty()) {
       const VkDeviceSize bufferSize = sizeof(model::Vertex) * geometry.vertices.size();
@@ -402,11 +413,11 @@ namespace app::vulkan_pipeline {
   }
 
   // Гарантирует, что слот инстансов текущего кадра вмещает не менее `count` инстансов.
-  void ensureInstanceCapacity(const VkDevice               device,
-                              const VkPhysicalDevice       physicalDevice,
+  void ensureInstanceCapacity(const VkDevice                device,
+                              const VkPhysicalDevice        physicalDevice,
                               model::PipelineVk_ShapeGroup &pipeline,
-                              const uint32_t               frame,
-                              const uint32_t               count)
+                              const uint32_t                frame,
+                              const uint32_t                count)
   {
     model::RingSlot &slot = pipeline.gpu.instanceRing[frame];
     if (count <= slot.capacity) {
@@ -419,12 +430,15 @@ namespace app::vulkan_pipeline {
   }
 
   // Группирует shapes по мешам и записывает данные инстансов в буфер текущего кадра.
-  export void updateInstanceData(const VkDevice device, const VkPhysicalDevice physicalDevice, model::PipelineVk_ShapeGroup &pipeline, const uint32_t frame)
+  export void updateInstanceData(const VkDevice                device,
+                                 const VkPhysicalDevice        physicalDevice,
+                                 model::PipelineVk_ShapeGroup &pipeline,
+                                 const uint32_t                frame)
   {
     const uint32_t count = static_cast<uint32_t>(pipeline.shapes.size());
     ensureInstanceCapacity(device, physicalDevice, pipeline, frame, count);
 
-    model::RingSlot &slot    = pipeline.gpu.instanceRing[frame];
+    const model::RingSlot &slot    = pipeline.gpu.instanceRing[frame];
     pipeline.gpu.drawBatches = groupShapes(pipeline.shapes,
                                            pipeline.gpu.meshRanges,
                                            static_cast<model::InstanceData *>(slot.mapped),
@@ -575,9 +589,8 @@ namespace app::vulkan_pipeline {
 
     // Настройки color blending Vulkan для attachment.
     VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-    colorBlendAttachment.colorWriteMask =
-        VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    colorBlendAttachment.blendEnable = VK_FALSE;
+    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    colorBlendAttachment.blendEnable    = VK_FALSE;
 
     // Состояние color blending Vulkan.
     VkPipelineColorBlendStateCreateInfo colorBlending{};
@@ -653,6 +666,7 @@ namespace app::vulkan_pipeline {
     vkCmdBindIndexBuffer(commandBuffer, renderData.indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
     // По одной инстансной команде рисования на меш.
+    // ReSharper disable once CppUseStructuredBinding
     for (const model::DrawBatch &batch : *renderData.batches) {
       vkCmdDrawIndexed(commandBuffer,
                        batch.range.indexCount,
@@ -663,16 +677,16 @@ namespace app::vulkan_pipeline {
     }
   }
 
-  export void recordCommandBuffer(const VkCommandBuffer                          commandBuffer,
-                                  const uint32_t                                 imageIndex,
-                                  const VkRenderPass                             renderPass,
-                                  const std::vector<VkFramebuffer>              &swapChainFramebuffers,
-                                  const VkExtent2D                               swapChainExtent,
-                                  const VkPipeline                               graphicsPipeline,
-                                  const VkPipelineLayout                         pipelineLayout,
-                                  const VkDescriptorSet                          lightSet,
-                                  const model::PushConstants                    &pushConstants,
-                                  const std::vector<model::PipelineRenderData>  &renderDatas)
+  export void recordCommandBuffer(const VkCommandBuffer                         commandBuffer,
+                                  const uint32_t                                imageIndex,
+                                  const VkRenderPass                            renderPass,
+                                  const std::vector<VkFramebuffer>             &swapChainFramebuffers,
+                                  const VkExtent2D                              swapChainExtent,
+                                  const VkPipeline                              graphicsPipeline,
+                                  const VkPipelineLayout                        pipelineLayout,
+                                  const VkDescriptorSet                         lightSet,
+                                  const model::PushConstants                   &pushConstants,
+                                  const std::vector<model::PipelineRenderData> &renderDatas)
   {
     // Параметры начала записи command buffer Vulkan.
     VkCommandBufferBeginInfo beginInfo{};

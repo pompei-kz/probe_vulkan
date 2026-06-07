@@ -57,10 +57,10 @@ TEST(PopulateWithSpheraFull, AllTriangleIndicesAreInRange)
   //
 
   const auto pointCount = static_cast<uint32_t>(mesh.points.size());
-  for (const cmd::TriangleIdx &tri : mesh.triangles) {
-    EXPECT_LT(tri.index0, pointCount);
-    EXPECT_LT(tri.index1, pointCount);
-    EXPECT_LT(tri.index2, pointCount);
+  for (const auto &[index0, index1, index2] : mesh.triangles) {
+    EXPECT_LT(index0, pointCount);
+    EXPECT_LT(index1, pointCount);
+    EXPECT_LT(index2, pointCount);
   }
 }
 
@@ -69,8 +69,8 @@ TEST(PopulateWithSpheraFull, AllTriangleIndicesAreInRange)
 // ---------------------------------------------------------------------------
 TEST(PopulateWithSpheraFull, AllPointsLieOnSphereSurface)
 {
-  const glm::vec3 center{-4.0F, 5.0F, 6.5F};
-  constexpr float radius = 3.25F;
+  constexpr glm::vec3 center{-4.0F, 5.0F, 6.5F};
+  constexpr float     radius = 3.25F;
 
   cmd::Mesh mesh;
 
@@ -90,9 +90,9 @@ TEST(PopulateWithSpheraFull, AllPointsLieOnSphereSurface)
 // ---------------------------------------------------------------------------
 TEST(PopulateWithSpheraFull, PolesFollowNorthPoleDirection)
 {
-  const glm::vec3 center{1.0F, 1.0F, 1.0F};
-  const glm::vec3 northDir{0.0F, 1.0F, 0.0F};
-  constexpr float radius = 2.0F;
+  constexpr glm::vec3 center{1.0F, 1.0F, 1.0F};
+  constexpr glm::vec3 northDir{0.0F, 1.0F, 0.0F};
+  constexpr float     radius = 2.0F;
 
   cmd::Mesh mesh;
 
@@ -106,7 +106,7 @@ TEST(PopulateWithSpheraFull, PolesFollowNorthPoleDirection)
   const glm::vec3 expectedTop = center + axis * radius;
   const glm::vec3 expectedBot = center - axis * radius;
 
-  // First point is the north pole, last point is the south pole.
+  // First point is the North Pole, last point is the South Pole.
   const glm::vec3 &top = mesh.points.front();
   const glm::vec3 &bot = mesh.points.back();
 
@@ -125,9 +125,9 @@ TEST(PopulateWithSpheraFull, PolesFollowNorthPoleDirection)
 // ---------------------------------------------------------------------------
 TEST(PopulateWithSpheraFull, NonUnitNorthPoleDirectionIsNormalized)
 {
-  const glm::vec3 center{0, 0, 0};
-  const glm::vec3 longNorthDir{0.0F, 0.0F, 17.0F}; // length 17, not 1
-  constexpr float radius = 4.0F;
+  constexpr glm::vec3 center{0, 0, 0};
+  constexpr glm::vec3 longNorthDir{0.0F, 0.0F, 17.0F}; // length 17, not 1
+  constexpr float     radius = 4.0F;
 
   cmd::Mesh mesh;
 
@@ -167,8 +167,7 @@ TEST(PopulateWithSpheraFull, NullTargetThrows)
 {
   //
   //
-  EXPECT_THROW(gen::populateWithSphera(nullptr, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, 1.0F, 4, 4),
-               std::invalid_argument);
+  EXPECT_THROW(gen::populateWithSphera(nullptr, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, 1.0F, 4, 4), std::invalid_argument);
   //
   //
 }
@@ -179,10 +178,8 @@ TEST(PopulateWithSpheraFull, NonPositiveRadiusThrows)
 
   //
   //
-  EXPECT_THROW(gen::populateWithSphera(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, 0.0F, 4, 4),
-               std::invalid_argument);
-  EXPECT_THROW(gen::populateWithSphera(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, -1.0F, 4, 4),
-               std::invalid_argument);
+  EXPECT_THROW(gen::populateWithSphera(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, 0.0F, 4, 4), std::invalid_argument);
+  EXPECT_THROW(gen::populateWithSphera(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, -1.0F, 4, 4), std::invalid_argument);
   //
   //
 }
@@ -193,8 +190,7 @@ TEST(PopulateWithSpheraFull, TooFewLatitudeSegmentsThrows)
 
   //
   //
-  EXPECT_THROW(gen::populateWithSphera(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, 1.0F, 1, 4),
-               std::invalid_argument);
+  EXPECT_THROW(gen::populateWithSphera(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, 1.0F, 1, 4), std::invalid_argument);
   //
   //
 }
@@ -205,8 +201,7 @@ TEST(PopulateWithSpheraFull, TooFewLongitudeSegmentsThrows)
 
   //
   //
-  EXPECT_THROW(gen::populateWithSphera(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, 1.0F, 4, 2),
-               std::invalid_argument);
+  EXPECT_THROW(gen::populateWithSphera(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, 1.0F, 4, 2), std::invalid_argument);
   //
   //
 }
@@ -217,8 +212,7 @@ TEST(PopulateWithSpheraFull, ZeroNorthPoleDirectionThrows)
 
   //
   //
-  EXPECT_THROW(gen::populateWithSphera(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 0}, 1.0F, 4, 4),
-               std::invalid_argument);
+  EXPECT_THROW(gen::populateWithSphera(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 0}, 1.0F, 4, 4), std::invalid_argument);
   //
   //
 }
