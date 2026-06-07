@@ -127,55 +127,55 @@ export namespace gen {
     }
   }
 
-  void populateWithCylinder(cmd::Mesh *, glm::vec3, glm::vec3, float, float, int, int);
+  void populateWithCylinder(cmd::Mesh *, glm::vec3, glm::vec3, float, int, int, bool, bool);
 
   /**
-   * Populates `target` with a cylinder centered in the beginning of coordinate system and its axis along Oz.
+   * Populates `target` with a closed cylinder centered in the beginning of coordinate system and its axis along Oz.
    * @param target target to populate
    * @param radius radius of cylinder
-   * @param height full height of cylinder along its axis
+   * @param height full height of cylinder along axis Oz
    * @param radialSegments segment count around the axis
    * @param heightSegments segment count along the axis
    */
-  void populateWithCylinder(cmd::Mesh  *target, //
-                            const float radius, //
-                            const float height, //
+  void populateWithCylinder(cmd::Mesh  *target,         //
+                            const float radius,         //
+                            const float height,         //
                             const int   radialSegments, //
                             const int   heightSegments)
   {
-    populateWithCylinder(target, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, radius, height, radialSegments, heightSegments);
+    const float halfHeight = height * 0.5F;
+    populateWithCylinder(target, glm::vec3{0, 0, -halfHeight}, glm::vec3{0, 0, halfHeight}, radius, radialSegments, heightSegments, false, false);
   }
 
   /**
-   * Populates `target` with a cylinder.
+   * Populates `target` with a cylinder spanning between two base centers.
    *
-   * The cylinder extends symmetrically by `height / 2` in both directions along `axisDirection`
-   * from `center`, and is capped on both ends.
+   * The cylinder axis goes from `center1` to `center2`; its height equals the distance
+   * between them. Each base can be capped or left open independently.
    *
    * @param target target to populate
-   * @param center center of the cylinder (midpoint of its axis)
-   * @param axisDirection direction of the cylinder axis - this vector may not be of length 1
+   * @param center1 center of the first base
+   * @param center2 center of the second base
    * @param radius radius of cylinder
-   * @param height full height of cylinder along its axis
    * @param radialSegments segment count around the axis
    * @param heightSegments segment count along the axis
+   * @param open1 if true, the base at `center1` is left open (no cap); if false, it is capped
+   * @param open2 if true, the base at `center2` is left open (no cap); if false, it is capped
    */
-  void populateWithCylinder(cmd::Mesh  *target,        //
-                            glm::vec3   center,        //
-                            glm::vec3   axisDirection, //
-                            const float radius,        //
-                            const float height,        //
+  void populateWithCylinder(cmd::Mesh  *target,         //
+                            glm::vec3   center1,        //
+                            glm::vec3   center2,        //
+                            const float radius,         //
                             const int   radialSegments, //
-                            const int   heightSegments)
+                            const int   heightSegments, //
+                            const bool  open1,          //
+                            const bool  open2)
   {
     if (target == nullptr) {
       throw std::invalid_argument("qD2hN7vKsP :: target mesh is null");
     }
     if (radius <= 0.0F) {
       throw std::invalid_argument("wL5cR1mTxB :: cylinder radius must be positive");
-    }
-    if (height <= 0.0F) {
-      throw std::invalid_argument("zG8pV4nQdH :: cylinder height must be positive");
     }
     if (radialSegments < 3) {
       throw std::invalid_argument("tK3sB9yMwL :: cylinder radialSegments must be at least 3");
@@ -184,11 +184,13 @@ export namespace gen {
       throw std::invalid_argument("nF6xD2cRpV :: cylinder heightSegments must be at least 1");
     }
 
-    if (const float axisLength2 = glm::dot(axisDirection, axisDirection); axisLength2 <= 0.0F) {
-      throw std::invalid_argument("jH4mQ8vTaC :: cylinder axisDirection must be non-zero");
+    const glm::vec3 axis = center2 - center1;
+    if (const float axisLength2 = glm::dot(axis, axis); axisLength2 <= 0.0F) {
+      throw std::invalid_argument("jH4mQ8vTaC :: cylinder center1 and center2 must differ");
     }
 
-    const glm::vec3 zAxis  = glm::normalize(axisDirection);
+    const float     height = glm::length(axis);
+    const glm::vec3 zAxis  = axis / height;
     const glm::vec3 helper = std::abs(zAxis.z) < 0.9F ? glm::vec3{0.0F, 0.0F, 1.0F} : glm::vec3{0.0F, 1.0F, 0.0F};
     const glm::vec3 xAxis  = glm::normalize(glm::cross(helper, zAxis));
     const glm::vec3 yAxis  = glm::normalize(glm::cross(zAxis, xAxis));
@@ -197,28 +199,35 @@ export namespace gen {
     target->triangles.clear();
 
     const size_t ringCount = static_cast<size_t>(heightSegments) + 1U;
-    target->points.reserve(ringCount * static_cast<size_t>(radialSegments) + 2U);
+    const size_t capCount  = static_cast<size_t>(open1 ? 0 : 1) + static_cast<size_t>(open2 ? 0 : 1);
+    target->points.reserve(ringCount * static_cast<size_t>(radialSegments) + capCount);
     target->triangles.reserve(static_cast<size_t>(heightSegments) * static_cast<size_t>(radialSegments) * 2U +
-                              static_cast<size_t>(radialSegments) * 2U);
-
-    const float halfHeight = height * 0.5F;
+                              capCount * static_cast<size_t>(radialSegments));
 
     // Точки боковой поверхности: (heightSegments + 1) колец по radialSegments точек.
+    // Кольцо 0 лежит в основании center1, кольцо heightSegments - в основании center2.
     for (int ring = 0; ring <= heightSegments; ++ring) {
-      const float     offset = -halfHeight + height * static_cast<float>(ring) / static_cast<float>(heightSegments);
-      const glm::vec3 base   = center + zAxis * offset;
+      const float     offset = height * static_cast<float>(ring) / static_cast<float>(heightSegments);
+      const glm::vec3 base   = center1 + zAxis * offset;
 
       for (int radial = 0; radial < radialSegments; ++radial) {
-        const float     phi    = 2.0F * PI * static_cast<float>(radial) / static_cast<float>(radialSegments);
+        const float     phi             = 2.0F * PI * static_cast<float>(radial) / static_cast<float>(radialSegments);
         const glm::vec3 radialDirection = std::cos(phi) * xAxis + std::sin(phi) * yAxis;
         target->points.push_back(base + radius * radialDirection);
       }
     }
 
-    const uint32_t topCenterIndex = static_cast<uint32_t>(target->points.size());
-    target->points.push_back(center + zAxis * halfHeight);
-    const uint32_t bottomCenterIndex = static_cast<uint32_t>(target->points.size());
-    target->points.push_back(center - zAxis * halfHeight);
+    // Центральные точки крышек добавляются только если соответствующее основание закрыто.
+    uint32_t center2Index = 0;
+    if (!open2) {
+      center2Index = static_cast<uint32_t>(target->points.size());
+      target->points.push_back(center2);
+    }
+    uint32_t center1Index = 0;
+    if (!open1) {
+      center1Index = static_cast<uint32_t>(target->points.size());
+      target->points.push_back(center1);
+    }
 
     const auto ringIndex = [radialSegments](const int ring, const int radial) {
       const int wrappedRadial = radial % radialSegments;
@@ -238,22 +247,26 @@ export namespace gen {
       }
     }
 
-    // Верхняя крышка, нумерация наружу (нормаль вдоль +axisDirection).
-    for (int radial = 0; radial < radialSegments; ++radial) {
-      target->triangles.push_back(cmd::TriangleIdx{
-          topCenterIndex,
-          ringIndex(heightSegments, radial + 1),
-          ringIndex(heightSegments, radial),
-      });
+    // Крышка основания center2, нумерация наружу (нормаль вдоль center2 - center1).
+    if (!open2) {
+      for (int radial = 0; radial < radialSegments; ++radial) {
+        target->triangles.push_back(cmd::TriangleIdx{
+            center2Index,
+            ringIndex(heightSegments, radial + 1),
+            ringIndex(heightSegments, radial),
+        });
+      }
     }
 
-    // Нижняя крышка, нумерация наружу (нормаль вдоль -axisDirection).
-    for (int radial = 0; radial < radialSegments; ++radial) {
-      target->triangles.push_back(cmd::TriangleIdx{
-          bottomCenterIndex,
-          ringIndex(0, radial),
-          ringIndex(0, radial + 1),
-      });
+    // Крышка основания center1, нумерация наружу (нормаль вдоль center1 - center2).
+    if (!open1) {
+      for (int radial = 0; radial < radialSegments; ++radial) {
+        target->triangles.push_back(cmd::TriangleIdx{
+            center1Index,
+            ringIndex(0, radial),
+            ringIndex(0, radial + 1),
+        });
+      }
     }
   }
 
