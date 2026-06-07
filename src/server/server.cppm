@@ -45,7 +45,7 @@ export namespace server {
         const auto sun = std::make_shared<cmd::CmdSetLight_Sun>();
         sun->id        = "a9Kp2nVqL4";
         sun->force     = 1.0F;
-        sun->direction = glm::vec3(-0.25F, -0.5F, -1.0F);
+        sun->direction = glm::vec3(0.25F, 0.5F, 1.0F);
         sun->color     = glm::vec3(1.0F, 1.0F, 0.95F);
 
         ret->sequence.push_back(sun);

@@ -195,8 +195,9 @@ namespace app {
 
     void uploadPipelineRuntimeData()
     {
-      std::vector<cmd::Mesh>  meshes;
-      std::vector<cmd::Shape> shapes;
+      std::vector<cmd::Mesh>     meshes;
+      std::vector<cmd::Material> materials;
+      std::vector<cmd::Shape>    shapes;
 
       for (const std::string &pipelineId : pipeline_ids_) {
         const auto pipelineIter = pipeline_map_.find(pipelineId);
@@ -205,17 +206,20 @@ namespace app {
         auto *shapeGroup = dynamic_cast<PipelineVk_ShapeGroup *>(pipelineIter->second.get());
         if (shapeGroup == nullptr) continue;
 
-        const uint32_t meshOffset = static_cast<uint32_t>(meshes.size());
+        const uint32_t meshOffset     = static_cast<uint32_t>(meshes.size());
+        const uint32_t materialOffset = static_cast<uint32_t>(materials.size());
         meshes.insert(meshes.end(), shapeGroup->meshes.begin(), shapeGroup->meshes.end());
+        materials.insert(materials.end(), shapeGroup->materials.begin(), shapeGroup->materials.end());
 
         for (cmd::Shape shape : shapeGroup->shapes) {
-          shape.meshIndex += meshOffset;
+          shape.meshIndex     += meshOffset;
+          shape.materialIndex += materialOffset;
           shapes.push_back(shape);
         }
       }
 
       if (!shapes.empty()) {
-        vulkan_.setShapeGroupData(meshes, shapes);
+        vulkan_.setShapeGroupData(meshes, materials, shapes);
       }
     }
 
@@ -297,6 +301,8 @@ namespace app {
       sun->force     = cmdPtr->force;
       sun->direction = cmdPtr->direction;
       sun->color     = cmdPtr->color;
+
+      vulkan_.setSunLight(sun->direction, sun->color, sun->force);
 
       std::unique_ptr<LightVk> light = std::move(sun);
       light_map_[cmdPtr->id]        = std::move(light);

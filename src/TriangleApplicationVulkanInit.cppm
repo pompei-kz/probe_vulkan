@@ -9,7 +9,6 @@ module;
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
-#include <shaderc/shaderc.hpp>
 #include <vulkan/vulkan.h>
 
 #include <algorithm>
@@ -17,8 +16,6 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <filesystem>
-#include <fstream>
 #include <limits>
 #include <optional>
 #include <set>
@@ -30,6 +27,8 @@ export module triangle_application_vulkan_init;
 
 import utils;
 import cmd_pipeline;
+import cmd_light;
+import vulkanPipeline;
 
 namespace app {
 
@@ -47,42 +46,7 @@ namespace app {
       VK_KHR_SWAPCHAIN_EXTENSION_NAME,
   };
 
-  struct Vertex
-  {
-    glm::vec3 position;
-
-    static VkVertexInputBindingDescription bindingDescription()
-    {
-      // Описание привязки vertex buffer Vulkan.
-      VkVertexInputBindingDescription binding{};
-      binding.binding   = 0;                           // Номер binding для vertex buffer.
-      binding.stride    = sizeof(Vertex);              // Размер одной вершины в байтах.
-      binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX; // Данные читаются отдельно для каждой вершины.
-      return binding;
-    }
-
-    static std::array<VkVertexInputAttributeDescription, 1> attributeDescriptions()
-    {
-      // Описание атрибута позиции вершины Vulkan.
-      std::array<VkVertexInputAttributeDescription, 1> attributes{};
-      attributes[0].binding  = 0;                          // Binding, из которого читается атрибут.
-      attributes[0].location = 0;                          // Location атрибута во входе vertex shader.
-      attributes[0].format   = VK_FORMAT_R32G32B32_SFLOAT; // Формат позиции: три float компонента.
-      attributes[0].offset   = offsetof(Vertex, position); // Смещение поля position внутри структуры Vertex.
-      return attributes;
-    }
-  };
-
   struct TransformMatrices
-  {
-    glm::mat4 model;
-    glm::mat4 view;
-    glm::mat4 projection;
-  };
-
-  // Данные push constants Vulkan, которые передаются напрямую в vertex shader.
-  // Структура должна совпадать с layout(push_constant) блоком в files/shaders/triangle.vert.
-  struct PushConstants
   {
     glm::mat4 model;
     glm::mat4 view;
@@ -91,9 +55,9 @@ namespace app {
 
   // ReSharper disable once CppTemplateArgumentsCanBeDeduced
   constexpr std::array<Vertex, 3> kTriangleVertices = {
-      Vertex{{0.0F, -0.5F, 0.0F}},
-      Vertex{{0.5F, 0.5F, 0.0F}},
-      Vertex{{-0.5F, 0.5F, 0.0F}},
+      Vertex{{0.0F, -0.5F, 0.0F}, {0.0F, 0.0F, 1.0F}, {0.0F, 0.25F, 1.0F}},
+      Vertex{{0.5F, 0.5F, 0.0F}, {0.0F, 0.0F, 1.0F}, {0.0F, 0.25F, 1.0F}},
+      Vertex{{-0.5F, 0.5F, 0.0F}, {0.0F, 0.0F, 1.0F}, {0.0F, 0.25F, 1.0F}},
   };
 
   constexpr std::array<uint32_t, 3> kTriangleIndices = {
@@ -132,7 +96,10 @@ namespace app {
     void setCameraUp(glm::vec3 up);
     void setCameraPlanes(float nearPlane, float farPlane);
     void setCameraFovDegrees(float fovDegrees);
-    void setShapeGroupData(const std::vector<cmd::Mesh> &meshes, const std::vector<cmd::Shape> &shapes);
+    void setSunLight(glm::vec3 direction, glm::vec3 color, float force);
+    void setShapeGroupData(const std::vector<cmd::Mesh>     &meshes,
+                           const std::vector<cmd::Material> &materials,
+                           const std::vector<cmd::Shape>    &shapes);
     void waitIdle() const;
     void cleanup();
     void drawFrame(bool &framebufferResized);
@@ -232,7 +199,6 @@ namespace app {
     static VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR> &presentModes);
     [[nodiscard]] VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities) const;
     void updateTransformMatrices();
-    [[nodiscard]] VkShaderModule createShaderModule(const std::vector<uint32_t> &code) const;
     [[nodiscard]] uint32_t findMemoryType(const uint32_t typeFilter, const VkMemoryPropertyFlags properties) const;
     void createBuffer(const VkDeviceSize          size,
                       const VkBufferUsageFlags    usage,
@@ -248,40 +214,6 @@ namespace app {
   };
 
 } // namespace app
-
-namespace {
-
-  std::string readTextFile(const std::filesystem::path &path)
-  {
-    std::ifstream file(path, std::ios::ate);
-
-    if (!file.is_open()) {
-      throw std::runtime_error("kQw7nPz4Lm :: failed to open " + path.string());
-    }
-
-    const size_t fileSize = file.tellg();
-    std::string  buffer(fileSize, '\0');
-    file.seekg(0);
-    file.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
-    return buffer;
-  }
-
-  std::vector<uint32_t> compileShader(const std::filesystem::path &path, const shaderc_shader_kind shaderKind)
-  {
-    const std::string source     = readTextFile(path);
-    const std::string pathString = path.string();
-
-    shaderc::Compiler                   compiler;
-    const shaderc::SpvCompilationResult result = compiler.CompileGlslToSpv(source, shaderKind, pathString.c_str());
-
-    if (result.GetCompilationStatus() != shaderc_compilation_status_success) {
-      throw std::runtime_error("tH7qN4vZpR :: failed to compile shader " + pathString + ": " + result.GetErrorMessage());
-    }
-
-    return {result.cbegin(), result.cend()};
-  }
-
-} // namespace
 
 namespace app {
 
@@ -340,7 +272,20 @@ namespace app {
     updateTransformMatrices();
   }
 
-  void VulkanInit::setShapeGroupData(const std::vector<cmd::Mesh> &meshes, const std::vector<cmd::Shape> &shapes)
+  void VulkanInit::setSunLight(const glm::vec3 direction, const glm::vec3 color, const float force)
+  {
+    if (glm::dot(direction, direction) <= 0.0F) {
+      throw std::invalid_argument("gP6vL1xZaE :: sun direction must be non-zero");
+    }
+
+    const glm::vec3 normalizedDirection = glm::normalize(direction);
+    pushConstants_.sunDirectionForce    = glm::vec4(normalizedDirection, force);
+    pushConstants_.sunColorAmbient      = glm::vec4(color, 0.18F);
+  }
+
+  void VulkanInit::setShapeGroupData(const std::vector<cmd::Mesh>     &meshes,
+                                     const std::vector<cmd::Material> &materials,
+                                     const std::vector<cmd::Shape>    &shapes)
   {
     std::vector<Vertex>   nextVertices;
     std::vector<uint32_t> nextIndices;
@@ -351,6 +296,9 @@ namespace app {
       if (shape.meshIndex >= meshes.size()) {
         throw std::out_of_range("sR4cN8vQpL :: shape meshIndex is out of range");
       }
+      if (shape.materialIndex >= materials.size()) {
+        throw std::out_of_range("dM7sK2rYqP :: shape materialIndex is out of range");
+      }
       vertexCount += meshes[shape.meshIndex].points.size();
       indexCount += meshes[shape.meshIndex].triangles.size() * 3U;
     }
@@ -360,6 +308,7 @@ namespace app {
 
     for (const cmd::Shape &shape : shapes) {
       const cmd::Mesh &mesh = meshes[shape.meshIndex];
+      const glm::vec3 materialColor = materials[shape.materialIndex].color;
 
       const float angle = glm::length(shape.rotationVector);
       const glm::quat rotation =
@@ -368,17 +317,34 @@ namespace app {
           glm::translate(glm::mat4(1.0F), shape.position) * glm::mat4_cast(rotation) * glm::scale(glm::mat4(1.0F), shape.scale);
 
       const uint32_t baseVertex = static_cast<uint32_t>(nextVertices.size());
+      std::vector<glm::vec3> transformedPoints;
+      std::vector<glm::vec3> normals(mesh.points.size(), glm::vec3(0.0F, 0.0F, 0.0F));
+      transformedPoints.reserve(mesh.points.size());
+
       for (const glm::vec3 &point : mesh.points) {
-        nextVertices.push_back(Vertex{glm::vec3(model * glm::vec4(point, 1.0F))});
+        transformedPoints.push_back(glm::vec3(model * glm::vec4(point, 1.0F)));
       }
 
       for (const cmd::TriangleIdx &triangle : mesh.triangles) {
         if (triangle.index0 >= mesh.points.size() || triangle.index1 >= mesh.points.size() || triangle.index2 >= mesh.points.size()) {
           throw std::out_of_range("uX9mD2bKhT :: triangle vertex index is out of range");
         }
+        const glm::vec3 edge0      = transformedPoints[triangle.index1] - transformedPoints[triangle.index0];
+        const glm::vec3 edge1      = transformedPoints[triangle.index2] - transformedPoints[triangle.index0];
+        const glm::vec3 faceNormal = glm::cross(edge1, edge0);
+        normals[triangle.index0] += faceNormal;
+        normals[triangle.index1] += faceNormal;
+        normals[triangle.index2] += faceNormal;
+
         nextIndices.push_back(baseVertex + triangle.index0);
         nextIndices.push_back(baseVertex + triangle.index1);
         nextIndices.push_back(baseVertex + triangle.index2);
+      }
+
+      for (size_t pointIndex = 0; pointIndex < transformedPoints.size(); ++pointIndex) {
+        const glm::vec3 normal =
+            glm::dot(normals[pointIndex], normals[pointIndex]) <= 0.0F ? glm::vec3(0.0F, 0.0F, 1.0F) : glm::normalize(normals[pointIndex]);
+        nextVertices.push_back(Vertex{transformedPoints[pointIndex], normal, materialColor});
       }
     }
 
@@ -787,164 +753,9 @@ namespace app {
     }
   }
 
-  [[nodiscard]] VkShaderModule VulkanInit::createShaderModule(const std::vector<uint32_t> &code) const
-  {
-    // Параметры создания shader module Vulkan.
-    VkShaderModuleCreateInfo createInfo{};
-    createInfo.sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO; // Тип структуры создания shader module.
-    createInfo.codeSize = code.size() * sizeof(uint32_t);              // Размер SPIR-V байткода в байтах.
-    createInfo.pCode    = code.data();                                 // Указатель на SPIR-V байткод shader.
-  
-    // Дескриптор shader module Vulkan.
-    VkShaderModule shaderModule = VK_NULL_HANDLE;
-    // Создаем shader module Vulkan.
-    if (vkCreateShaderModule(device_, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
-      throw std::runtime_error("gW4vC9hTxN :: failed to create shader module");
-    }
-    return shaderModule;
-  }
-
   void VulkanInit::createGraphicsPipeline()
   {
-    const std::filesystem::path shaderPath     = executableBasePath() / "shaders";
-    const std::vector<uint32_t> vertShaderCode = compileShader(shaderPath / "triangle.vert", shaderc_vertex_shader);
-    const std::vector<uint32_t> fragShaderCode = compileShader(shaderPath / "triangle.frag", shaderc_fragment_shader);
-  
-    // Vertex shader module Vulkan.
-    const VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
-    // Fragment shader module Vulkan.
-    const VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
-  
-    // Стадия vertex shader Vulkan.
-    VkPipelineShaderStageCreateInfo vertShaderStageInfo{};
-    vertShaderStageInfo.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO; // Тип структуры стадии shader pipeline.
-    vertShaderStageInfo.stage  = VK_SHADER_STAGE_VERTEX_BIT;                          // Стадия vertex shader.
-    vertShaderStageInfo.module = vertShaderModule;                                    // Shader module с vertex shader.
-    vertShaderStageInfo.pName  = "main";                                              // Точка входа в shader module.
-  
-    // Стадия fragment shader Vulkan.
-    VkPipelineShaderStageCreateInfo fragShaderStageInfo{};
-    fragShaderStageInfo.sType  = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO; // Тип структуры стадии shader pipeline.
-    fragShaderStageInfo.stage  = VK_SHADER_STAGE_FRAGMENT_BIT;                        // Стадия fragment shader.
-    fragShaderStageInfo.module = fragShaderModule;                                    // Shader module с fragment shader.
-    fragShaderStageInfo.pName  = "main";                                              // Точка входа в shader module.
-  
-    // Список shader stages Vulkan.
-    const VkPipelineShaderStageCreateInfo shaderStages[] = {vertShaderStageInfo, fragShaderStageInfo};
-  
-    // Описание binding для vertex buffer Vulkan.
-    const VkVertexInputBindingDescription bindingDescription                     = Vertex::bindingDescription();
-    // Описание attributes для vertex buffer Vulkan.
-    const std::array<VkVertexInputAttributeDescription, 1> attributeDescriptions = Vertex::attributeDescriptions();
-  
-    // Описание входных вершин Vulkan.
-    VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
-    vertexInputInfo.sType                           = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO; // Тип структуры vertex input.
-    vertexInputInfo.vertexBindingDescriptionCount   = 1;                                                         // Количество binding descriptions.
-    vertexInputInfo.pVertexBindingDescriptions      = &bindingDescription;                                 // Описание шага и binding vertex buffer.
-    vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size()); // Количество vertex attributes.
-    vertexInputInfo.pVertexAttributeDescriptions    = attributeDescriptions.data(); // Описание формата и location vertex attributes.
-  
-    // Описание сборки примитивов Vulkan.
-    VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
-    inputAssembly.sType                  = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO; // Тип структуры input assembly.
-    inputAssembly.topology               = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST; // Каждые три вершины образуют отдельный треугольник.
-    inputAssembly.primitiveRestartEnable = VK_FALSE;                            // Primitive restart для индексов отключен.
-  
-    // Viewport Vulkan для области отрисовки.
-    VkViewport viewport{};
-    viewport.x        = 0.0F;                                        // Левая граница viewport.
-    viewport.y        = 0.0F;                                        // Верхняя граница viewport.
-    viewport.width    = static_cast<float>(swapChainExtent_.width);  // Ширина viewport равна ширине swap-chain.
-    viewport.height   = static_cast<float>(swapChainExtent_.height); // Высота viewport равна высоте swap-chain.
-    viewport.minDepth = 0.0F;                                        // Минимальная глубина viewport.
-    viewport.maxDepth = 1.0F;                                        // Максимальная глубина viewport.
-  
-    // Scissor Vulkan для ограничения области отрисовки.
-    VkRect2D scissor{};
-    scissor.offset = {0, 0};           // Начало прямоугольника scissor.
-    scissor.extent = swapChainExtent_; // Размер scissor равен размеру swap-chain.
-  
-    // Состояние viewport/scissor Vulkan.
-    VkPipelineViewportStateCreateInfo viewportState{};
-    viewportState.sType         = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO; // Тип структуры viewport state.
-    viewportState.viewportCount = 1;                                                     // Количество viewport в pipeline.
-    viewportState.pViewports    = &viewport;                                             // Описание viewport.
-    viewportState.scissorCount  = 1;                                                     // Количество scissor rectangles.
-    viewportState.pScissors     = &scissor;                                              // Описание scissor rectangle.
-  
-    // Состояние растеризации Vulkan.
-    VkPipelineRasterizationStateCreateInfo rasterizer{};
-    rasterizer.sType                   = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO; // Тип структуры rasterization state.
-    rasterizer.depthClampEnable        = VK_FALSE;                                                   // Обрезаем фрагменты вне диапазона глубины.
-    rasterizer.rasterizerDiscardEnable = VK_FALSE;                                                   // Растеризация включена.
-    rasterizer.polygonMode             = VK_POLYGON_MODE_FILL;                                       // Треугольники заполняются целиком.
-    rasterizer.lineWidth               = 1.0F;                                                       // Толщина линий для line topology.
-    rasterizer.cullMode                = VK_CULL_MODE_NONE;                                          // Отсечение граней отключено.
-    rasterizer.frontFace               = VK_FRONT_FACE_CLOCKWISE; // Вершины по часовой стрелке считаются лицевой стороной.
-    rasterizer.depthBiasEnable         = VK_FALSE;                // Depth bias отключен.
-  
-    // Состояние multisampling Vulkan.
-    VkPipelineMultisampleStateCreateInfo multisampling{};
-    multisampling.sType                = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO; // Тип структуры multisample state.
-    multisampling.sampleShadingEnable  = VK_FALSE;                                                 // Sample shading отключен.
-    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT; // Multisampling отключен, один sample на пиксель.
-  
-    // Настройки color blending Vulkan для attachment.
-    VkPipelineColorBlendAttachmentState colorBlendAttachment{};
-    colorBlendAttachment.colorWriteMask =
-        VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT; // Разрешаем запись RGBA каналов.
-    colorBlendAttachment.blendEnable = VK_FALSE;                                                                   // Смешивание цветов отключено.
-  
-    // Состояние color blending Vulkan.
-    VkPipelineColorBlendStateCreateInfo colorBlending{};
-    colorBlending.sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO; // Тип структуры color blend state.
-    colorBlending.logicOpEnable   = VK_FALSE;                                                 // Логические операции смешивания отключены.
-    colorBlending.attachmentCount = 1;                                                        // Количество настроек blending для attachments.
-    colorBlending.pAttachments    = &colorBlendAttachment;                                    // Настройки blending для color attachment.
-  
-    // Layout pipeline Vulkan.
-    // Диапазон push constants Vulkan для матриц трансформации.
-    VkPushConstantRange pushConstantRange{};
-    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT; // Push constants доступны vertex shader.
-    pushConstantRange.offset     = 0;                          // Смещение диапазона push constants.
-    pushConstantRange.size       = sizeof(PushConstants);      // Размер данных push constants.
-  
-    // Layout pipeline Vulkan.
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-    pipelineLayoutInfo.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO; // Тип структуры создания pipeline layout.
-    pipelineLayoutInfo.pushConstantRangeCount = 1;                                             // Количество диапазонов push constants.
-    pipelineLayoutInfo.pPushConstantRanges    = &pushConstantRange;                            // Описание диапазона push constants.
-  
-    // Создаем layout pipeline Vulkan.
-    if (vkCreatePipelineLayout(device_, &pipelineLayoutInfo, nullptr, &pipelineLayout_) != VK_SUCCESS) {
-      throw std::runtime_error("dP6kR2mZaS :: failed to create pipeline layout");
-    }
-  
-    // Параметры создания графического pipeline Vulkan.
-    VkGraphicsPipelineCreateInfo pipelineInfo{};
-    pipelineInfo.sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO; // Тип структуры создания graphics pipeline.
-    pipelineInfo.stageCount          = 2;                                               // Количество shader stages.
-    pipelineInfo.pStages             = shaderStages;                                    // Описания vertex и fragment shader stages.
-    pipelineInfo.pVertexInputState   = &vertexInputInfo;                                // Описание входных vertex данных.
-    pipelineInfo.pInputAssemblyState = &inputAssembly;                                  // Описание сборки примитивов.
-    pipelineInfo.pViewportState      = &viewportState;                                  // Описание viewport и scissor.
-    pipelineInfo.pRasterizationState = &rasterizer;                                     // Описание растеризации.
-    pipelineInfo.pMultisampleState   = &multisampling;                                  // Описание multisampling.
-    pipelineInfo.pColorBlendState    = &colorBlending;                                  // Описание color blending.
-    pipelineInfo.layout              = pipelineLayout_;                                 // Pipeline layout с push constants.
-    pipelineInfo.renderPass          = renderPass_;                                     // Render pass, с которым совместим pipeline.
-    pipelineInfo.subpass             = 0;                                               // Индекс subpass внутри render pass.
-  
-    // Создаем графический pipeline Vulkan.
-    if (vkCreateGraphicsPipelines(device_, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &graphicsPipeline_) != VK_SUCCESS) {
-      throw std::runtime_error("yL9fV5qBnE :: failed to create graphics pipeline");
-    }
-  
-    // Уничтожаем fragment shader module Vulkan.
-    vkDestroyShaderModule(device_, fragShaderModule, nullptr);
-    // Уничтожаем vertex shader module Vulkan.
-    vkDestroyShaderModule(device_, vertShaderModule, nullptr);
+    vulkan_pipeline::createGraphicsPipeline(device_, swapChainExtent_, renderPass_, pipelineLayout_, graphicsPipeline_);
   }
 
   void VulkanInit::createFramebuffers()

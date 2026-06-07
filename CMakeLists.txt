@@ -34,6 +34,7 @@ target_sources(
   src/cmd/cmd.cppm
   src/cmd/cmd_pipeline.cppm
   src/cmd/cmd_light.cppm
+  src/vulkanPipeline.cppm
   src/TriangleApplicationVulkanInit.cppm
 )
 
