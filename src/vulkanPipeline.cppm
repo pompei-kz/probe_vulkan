@@ -7,6 +7,8 @@ module;
 #include <vulkan/vulkan.h>
 
 #include <array>
+#include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <stdexcept>
 #include <vector>
@@ -30,8 +32,9 @@ namespace app::vulkan_pipeline {
     pushConstants.sunColorAmbient       = glm::vec4(color, 0.18F);
   }
 
-  export model::GeometryData
-  buildShapeGroupGeometry(const std::vector<cmd::Mesh> &meshes, const std::vector<cmd::Material> &materials, const std::vector<cmd::Shape> &shapes)
+  export model::GeometryData buildShapeGroupGeometry(const std::vector<cmd::Mesh>     &meshes,
+                                                     const std::vector<cmd::Material> &materials,
+                                                     const std::vector<cmd::Shape>    &shapes)
   {
     model::GeometryData result;
 
@@ -92,6 +95,158 @@ namespace app::vulkan_pipeline {
     }
 
     return result;
+  }
+
+  [[nodiscard]] uint32_t findMemoryType(const VkPhysicalDevice physicalDevice, const uint32_t typeFilter, const VkMemoryPropertyFlags properties)
+  {
+    // Свойства памяти физического устройства Vulkan.
+    VkPhysicalDeviceMemoryProperties memoryProperties{};
+    // Получаем свойства памяти физического устройства Vulkan.
+    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memoryProperties);
+
+    for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; ++i) {
+      // ReSharper disable once CppRedundantParentheses
+      if ((typeFilter & (1 << i)) != 0 && (memoryProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+        return i;
+      }
+    }
+
+    throw std::runtime_error("nH4pT7wXaC :: failed to find suitable Vulkan memory type");
+  }
+
+  void createBuffer(const VkDevice              device,
+                    const VkPhysicalDevice      physicalDevice,
+                    const VkDeviceSize          size,
+                    const VkBufferUsageFlags    usage,
+                    const VkMemoryPropertyFlags properties,
+                    VkBuffer                   &buffer,
+                    VkDeviceMemory             &bufferMemory)
+  {
+    // Параметры создания buffer Vulkan.
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO; // Тип структуры создания buffer.
+    bufferInfo.size        = size;                                 // Размер buffer в байтах.
+    bufferInfo.usage       = usage;                                // Назначение buffer: vertex, index или другое.
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;            // Buffer используется одним семейством очередей.
+
+    // Создаем buffer Vulkan.
+    if (vkCreateBuffer(device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
+      throw std::runtime_error("bQ8mS2vPrL :: failed to create Vulkan buffer");
+    }
+
+    // Требования памяти Vulkan для buffer.
+    VkMemoryRequirements memoryRequirements{};
+    // Получаем требования памяти Vulkan для buffer.
+    vkGetBufferMemoryRequirements(device, buffer, &memoryRequirements);
+
+    // Параметры выделения памяти Vulkan.
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;                                        // Тип структуры выделения памяти.
+    allocInfo.allocationSize  = memoryRequirements.size;                                                       // Размер выделяемой памяти.
+    allocInfo.memoryTypeIndex = findMemoryType(physicalDevice, memoryRequirements.memoryTypeBits, properties); // Индекс подходящего типа памяти.
+
+    // Выделяем память Vulkan для buffer.
+    if (vkAllocateMemory(device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+      throw std::runtime_error("kV6xM9pNdE :: failed to allocate Vulkan buffer memory");
+    }
+
+    // Привязываем память Vulkan к buffer.
+    if (vkBindBufferMemory(device, buffer, bufferMemory, 0) != VK_SUCCESS) {
+      throw std::runtime_error("rC3tL8yHsW :: failed to bind Vulkan buffer memory");
+    }
+  }
+
+  void uploadBufferData(const VkDevice device, const VkDeviceMemory bufferMemory, const void *source, const VkDeviceSize size)
+  {
+    void *data = nullptr;
+    // Отображаем память Vulkan в адресное пространство CPU.
+    if (vkMapMemory(device, bufferMemory, 0, size, 0, &data) != VK_SUCCESS) {
+      throw std::runtime_error("uP2eN5qKtB :: failed to map Vulkan buffer memory");
+    }
+    std::memcpy(data, source, size);
+    // Завершаем отображение памяти Vulkan.
+    vkUnmapMemory(device, bufferMemory);
+  }
+
+  export void destroyPipelineGeometryBuffers(const VkDevice device, model::VulkanPipelineDescriptors &pipelineDescriptors)
+  {
+    if (device == VK_NULL_HANDLE) return;
+
+    if (pipelineDescriptors.indexBuffer != VK_NULL_HANDLE) {
+      vkDestroyBuffer(device, pipelineDescriptors.indexBuffer, nullptr);
+      pipelineDescriptors.indexBuffer = VK_NULL_HANDLE;
+    }
+    if (pipelineDescriptors.indexBufferMemory != VK_NULL_HANDLE) {
+      vkFreeMemory(device, pipelineDescriptors.indexBufferMemory, nullptr);
+      pipelineDescriptors.indexBufferMemory = VK_NULL_HANDLE;
+    }
+    if (pipelineDescriptors.vertexBuffer != VK_NULL_HANDLE) {
+      vkDestroyBuffer(device, pipelineDescriptors.vertexBuffer, nullptr);
+      pipelineDescriptors.vertexBuffer = VK_NULL_HANDLE;
+    }
+    if (pipelineDescriptors.vertexBufferMemory != VK_NULL_HANDLE) {
+      vkFreeMemory(device, pipelineDescriptors.vertexBufferMemory, nullptr);
+      pipelineDescriptors.vertexBufferMemory = VK_NULL_HANDLE;
+    }
+  }
+
+  export void createPipelineVertexBuffer(const VkDevice                    device,
+                                         const VkPhysicalDevice            physicalDevice,
+                                         model::VulkanPipelineDescriptors &pipelineDescriptors)
+  {
+    if (pipelineDescriptors.vertices.empty()) return;
+
+    const VkDeviceSize bufferSize = sizeof(pipelineDescriptors.vertices[0]) * pipelineDescriptors.vertices.size();
+    createBuffer(device,
+                 physicalDevice,
+                 bufferSize,
+                 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 pipelineDescriptors.vertexBuffer,
+                 pipelineDescriptors.vertexBufferMemory);
+    uploadBufferData(device, pipelineDescriptors.vertexBufferMemory, pipelineDescriptors.vertices.data(), bufferSize);
+  }
+
+  export void createPipelineIndexBuffer(const VkDevice                    device,
+                                        const VkPhysicalDevice            physicalDevice,
+                                        model::VulkanPipelineDescriptors &pipelineDescriptors)
+  {
+    if (pipelineDescriptors.indices.empty()) return;
+
+    const VkDeviceSize bufferSize = sizeof(pipelineDescriptors.indices[0]) * pipelineDescriptors.indices.size();
+    createBuffer(device,
+                 physicalDevice,
+                 bufferSize,
+                 VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 pipelineDescriptors.indexBuffer,
+                 pipelineDescriptors.indexBufferMemory);
+    uploadBufferData(device, pipelineDescriptors.indexBufferMemory, pipelineDescriptors.indices.data(), bufferSize);
+  }
+
+  export void recreatePipelineGeometryBuffers(const VkDevice                    device,
+                                              const VkPhysicalDevice            physicalDevice,
+                                              model::VulkanPipelineDescriptors &pipelineDescriptors)
+  {
+    if (device == VK_NULL_HANDLE) return;
+
+    vkDeviceWaitIdle(device);
+    destroyPipelineGeometryBuffers(device, pipelineDescriptors);
+    createPipelineVertexBuffer(device, physicalDevice, pipelineDescriptors);
+    createPipelineIndexBuffer(device, physicalDevice, pipelineDescriptors);
+  }
+
+  export void setShapeGroupData(const VkDevice                    device,
+                                const VkPhysicalDevice            physicalDevice,
+                                model::VulkanPipelineDescriptors &pipelineDescriptors,
+                                const std::vector<cmd::Mesh>     &meshes,
+                                const std::vector<cmd::Material> &materials,
+                                const std::vector<cmd::Shape>    &shapes)
+  {
+    model::GeometryData geometry = buildShapeGroupGeometry(meshes, materials, shapes);
+    pipelineDescriptors.vertices = std::move(geometry.vertices);
+    pipelineDescriptors.indices  = std::move(geometry.indices);
+    recreatePipelineGeometryBuffers(device, physicalDevice, pipelineDescriptors);
   }
 
   void recordPipelineDraw(const VkCommandBuffer commandBuffer, const model::PipelineDrawData &pipelineDraw, const model::PushConstants &pushConstants)

@@ -37,13 +37,11 @@ namespace app {
 
     getter::Getter<Settings> &setting_;
 
-    // TODO use this map to draw pipelines in Vulkan
     std::unordered_map<std::string, std::unique_ptr<model::PipelineVk>> pipeline_map_;
-    std::vector<std::string>                                           pipeline_ids_; // TODO in this oder use pipelines
+    std::vector<std::string>                                            pipeline_ids_;
 
-    // TODO use this map to use lights in Vulkan
     std::unordered_map<std::string, std::unique_ptr<model::LightVk>> light_map_;
-    std::vector<std::string>                                        light_ids_; // TODO in this oder use lights
+    std::vector<std::string>                                         light_ids_;
 
     sync::SyncQueue<cmd::CmdPtr> commands_;
 
@@ -154,8 +152,7 @@ namespace app {
         auto *shapeGroup = dynamic_cast<model::PipelineVk_ShapeGroup *>(pipelineIter->second.get());
         if (shapeGroup == nullptr || !shapeGroup->shapeCountFn) continue;
 
-        const size_t shapeCount = shapeGroup->shapeCountFn();
-        if (shapeGroup->shapes.size() != shapeCount) {
+        if (const size_t shapeCount = shapeGroup->shapeCountFn(); shapeGroup->shapes.size() != shapeCount) {
           shapeGroup->shapes.resize(shapeCount);
         }
         if (shapeGroup->populateShapesFn) {
@@ -228,6 +225,7 @@ namespace app {
       }
     }
 
+    // ReSharper disable once CppPassValueParameterByConstReference
     void execute_CmdPipeline_ShapeGroup(const std::shared_ptr<cmd::CmdSetPipeline_ShapeGroup> cmdPtr)
     {
       if (cmdPtr->id.empty()) {
@@ -271,7 +269,7 @@ namespace app {
       vulkan_.setSunLight(sun->direction, sun->color, sun->force);
 
       std::unique_ptr<model::LightVk> light = std::move(sun);
-      light_map_[cmdPtr->id]         = std::move(light);
+      light_map_[cmdPtr->id]                = std::move(light);
 
       if (isNewLight) {
         light_ids_.push_back(cmdPtr->id);

@@ -185,10 +185,6 @@ namespace app {
     void                      recreateGeometryBuffers();
     void                      createPipelineGraphicsObjects(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
     void                      destroyPipelineGraphicsObjects(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
-    void                      destroyPipelineGeometryBuffers(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
-    void                      recreatePipelineGeometryBuffers(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
-    void                      createPipelineVertexBuffer(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
-    void                      createPipelineIndexBuffer(model::VulkanPipelineDescriptors &pipelineDescriptors) const;
     void                      recordCommandBuffer(const VkCommandBuffer commandBuffer, const uint32_t imageIndex) const;
     void                      recreateSwapChain();
     void                      cleanupSwapChain();
@@ -266,7 +262,7 @@ namespace app {
   void VulkanInit::createPipelineDescriptors(model::VulkanPipelineDescriptors &pipelineDescriptors) const
   {
     createPipelineGraphicsObjects(pipelineDescriptors);
-    recreatePipelineGeometryBuffers(pipelineDescriptors);
+    vulkan_pipeline::recreatePipelineGeometryBuffers(device_, physicalDevice_, pipelineDescriptors);
   }
 
   void VulkanInit::destroyPipelineDescriptors(model::VulkanPipelineDescriptors &pipelineDescriptors) const
@@ -274,7 +270,7 @@ namespace app {
     if (device_ == VK_NULL_HANDLE) return;
 
     vkDeviceWaitIdle(device_);
-    destroyPipelineGeometryBuffers(pipelineDescriptors);
+    vulkan_pipeline::destroyPipelineGeometryBuffers(device_, pipelineDescriptors);
     destroyPipelineGraphicsObjects(pipelineDescriptors);
     pipelineDescriptors.vertices.clear();
     pipelineDescriptors.indices.clear();
@@ -295,10 +291,7 @@ namespace app {
                                      const std::vector<cmd::Material> &materials,
                                      const std::vector<cmd::Shape>    &shapes) const
   {
-    model::GeometryData geometry = vulkan_pipeline::buildShapeGroupGeometry(meshes, materials, shapes);
-    pipelineDescriptors.vertices = std::move(geometry.vertices);
-    pipelineDescriptors.indices  = std::move(geometry.indices);
-    recreatePipelineGeometryBuffers(pipelineDescriptors);
+    vulkan_pipeline::setShapeGroupData(device_, physicalDevice_, pipelineDescriptors, meshes, materials, shapes);
   }
 
   void VulkanInit::createInstance()
@@ -868,61 +861,6 @@ namespace app {
     }
   }
 
-  void VulkanInit::destroyPipelineGeometryBuffers(model::VulkanPipelineDescriptors &pipelineDescriptors) const
-  {
-    if (pipelineDescriptors.indexBuffer != VK_NULL_HANDLE) {
-      vkDestroyBuffer(device_, pipelineDescriptors.indexBuffer, nullptr);
-      pipelineDescriptors.indexBuffer = VK_NULL_HANDLE;
-    }
-    if (pipelineDescriptors.indexBufferMemory != VK_NULL_HANDLE) {
-      vkFreeMemory(device_, pipelineDescriptors.indexBufferMemory, nullptr);
-      pipelineDescriptors.indexBufferMemory = VK_NULL_HANDLE;
-    }
-    if (pipelineDescriptors.vertexBuffer != VK_NULL_HANDLE) {
-      vkDestroyBuffer(device_, pipelineDescriptors.vertexBuffer, nullptr);
-      pipelineDescriptors.vertexBuffer = VK_NULL_HANDLE;
-    }
-    if (pipelineDescriptors.vertexBufferMemory != VK_NULL_HANDLE) {
-      vkFreeMemory(device_, pipelineDescriptors.vertexBufferMemory, nullptr);
-      pipelineDescriptors.vertexBufferMemory = VK_NULL_HANDLE;
-    }
-  }
-
-  void VulkanInit::recreatePipelineGeometryBuffers(model::VulkanPipelineDescriptors &pipelineDescriptors) const
-  {
-    if (device_ == VK_NULL_HANDLE) return;
-    vkDeviceWaitIdle(device_);
-    destroyPipelineGeometryBuffers(pipelineDescriptors);
-    createPipelineVertexBuffer(pipelineDescriptors);
-    createPipelineIndexBuffer(pipelineDescriptors);
-  }
-
-  void VulkanInit::createPipelineVertexBuffer(model::VulkanPipelineDescriptors &pipelineDescriptors) const
-  {
-    if (pipelineDescriptors.vertices.empty()) return;
-
-    const VkDeviceSize bufferSize = sizeof(pipelineDescriptors.vertices[0]) * pipelineDescriptors.vertices.size();
-    createBuffer(bufferSize,
-                 VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                 pipelineDescriptors.vertexBuffer,
-                 pipelineDescriptors.vertexBufferMemory);
-    uploadBufferData(pipelineDescriptors.vertexBufferMemory, pipelineDescriptors.vertices.data(), bufferSize);
-  }
-
-  void VulkanInit::createPipelineIndexBuffer(model::VulkanPipelineDescriptors &pipelineDescriptors) const
-  {
-    if (pipelineDescriptors.indices.empty()) return;
-
-    const VkDeviceSize bufferSize = sizeof(pipelineDescriptors.indices[0]) * pipelineDescriptors.indices.size();
-    createBuffer(bufferSize,
-                 VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                 pipelineDescriptors.indexBuffer,
-                 pipelineDescriptors.indexBufferMemory);
-    uploadBufferData(pipelineDescriptors.indexBufferMemory, pipelineDescriptors.indices.data(), bufferSize);
-  }
-
   void VulkanInit::createVertexBuffer()
   {
     if (vertices_.empty()) return;
@@ -1054,7 +992,7 @@ namespace app {
     destroyGeometryBuffers();
     for (model::VulkanPipelineDescriptors *pipelineDescriptors : pipelineDescriptors_) {
       if (pipelineDescriptors == nullptr) continue;
-      destroyPipelineGeometryBuffers(*pipelineDescriptors);
+      vulkan_pipeline::destroyPipelineGeometryBuffers(device_, *pipelineDescriptors);
     }
     pipelineDescriptors_.clear();
 
