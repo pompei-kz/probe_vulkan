@@ -8,12 +8,9 @@ module;
 #include <SDL3/SDL_vulkan.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/quaternion.hpp>
 #include <vulkan/vulkan.h>
 
 #include <algorithm>
-#include <array>
-#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <limits>
@@ -27,7 +24,6 @@ export module triangle_application_vulkan_init;
 
 import util;
 import cmd_pipeline;
-import cmd_light;
 import vulkanPipeline;
 
 namespace app {
@@ -51,19 +47,6 @@ namespace app {
     glm::mat4 model;
     glm::mat4 view;
     glm::mat4 projection;
-  };
-
-  // ReSharper disable once CppTemplateArgumentsCanBeDeduced
-  constexpr std::array<Vertex, 3> kTriangleVertices = {
-      Vertex{{0.0F, -0.5F, 0.0F}, {0.0F, 0.0F, 1.0F}, {0.0F, 0.25F, 1.0F}},
-      Vertex{{0.5F, 0.5F, 0.0F}, {0.0F, 0.0F, 1.0F}, {0.0F, 0.25F, 1.0F}},
-      Vertex{{-0.5F, 0.5F, 0.0F}, {0.0F, 0.0F, 1.0F}, {0.0F, 0.25F, 1.0F}},
-  };
-
-  constexpr std::array<uint32_t, 3> kTriangleIndices = {
-      0,
-      1,
-      2,
   };
 
   struct QueueFamilyIndices
@@ -163,8 +146,8 @@ namespace app {
     VkBuffer indexBuffer_              = VK_NULL_HANDLE;
     // Память Vulkan для index buffer.
     VkDeviceMemory indexBufferMemory_  = VK_NULL_HANDLE;
-    std::vector<Vertex>   vertices_{kTriangleVertices.begin(), kTriangleVertices.end()};
-    std::vector<uint32_t> indices_{kTriangleIndices.begin(), kTriangleIndices.end()};
+    std::vector<Vertex>   vertices_{vulkan_pipeline::defaultVertices()};
+    std::vector<uint32_t> indices_{vulkan_pipeline::defaultIndices()};
 
     // Пул командных буферов Vulkan.
     VkCommandPool commandPool_ = VK_NULL_HANDLE;
@@ -274,82 +257,16 @@ namespace app {
 
   void VulkanInit::setSunLight(const glm::vec3 direction, const glm::vec3 color, const float force)
   {
-    if (glm::dot(direction, direction) <= 0.0F) {
-      throw std::invalid_argument("gP6vL1xZaE :: sun direction must be non-zero");
-    }
-
-    const glm::vec3 normalizedDirection = glm::normalize(direction);
-    pushConstants_.sunDirectionForce    = glm::vec4(normalizedDirection, force);
-    pushConstants_.sunColorAmbient      = glm::vec4(color, 0.18F);
+    vulkan_pipeline::setSunLight(pushConstants_, direction, color, force);
   }
 
   void VulkanInit::setShapeGroupData(const std::vector<cmd::Mesh>     &meshes,
                                      const std::vector<cmd::Material> &materials,
                                      const std::vector<cmd::Shape>    &shapes)
   {
-    std::vector<Vertex>   nextVertices;
-    std::vector<uint32_t> nextIndices;
-
-    size_t vertexCount = 0;
-    size_t indexCount  = 0;
-    for (const cmd::Shape &shape : shapes) {
-      if (shape.meshIndex >= meshes.size()) {
-        throw std::out_of_range("sR4cN8vQpL :: shape meshIndex is out of range");
-      }
-      if (shape.materialIndex >= materials.size()) {
-        throw std::out_of_range("dM7sK2rYqP :: shape materialIndex is out of range");
-      }
-      vertexCount += meshes[shape.meshIndex].points.size();
-      indexCount += meshes[shape.meshIndex].triangles.size() * 3U;
-    }
-
-    nextVertices.reserve(vertexCount);
-    nextIndices.reserve(indexCount);
-
-    for (const cmd::Shape &shape : shapes) {
-      const cmd::Mesh &mesh = meshes[shape.meshIndex];
-      const glm::vec3 materialColor = materials[shape.materialIndex].color;
-
-      const float angle = glm::length(shape.rotationVector);
-      const glm::quat rotation =
-          angle <= 0.000001F ? glm::quat(1.0F, 0.0F, 0.0F, 0.0F) : glm::angleAxis(angle, shape.rotationVector / angle);
-      const glm::mat4 model =
-          glm::translate(glm::mat4(1.0F), shape.position) * glm::mat4_cast(rotation) * glm::scale(glm::mat4(1.0F), shape.scale);
-
-      const uint32_t baseVertex = static_cast<uint32_t>(nextVertices.size());
-      std::vector<glm::vec3> transformedPoints;
-      std::vector<glm::vec3> normals(mesh.points.size(), glm::vec3(0.0F, 0.0F, 0.0F));
-      transformedPoints.reserve(mesh.points.size());
-
-      for (const glm::vec3 &point : mesh.points) {
-        transformedPoints.push_back(glm::vec3(model * glm::vec4(point, 1.0F)));
-      }
-
-      for (const cmd::TriangleIdx &triangle : mesh.triangles) {
-        if (triangle.index0 >= mesh.points.size() || triangle.index1 >= mesh.points.size() || triangle.index2 >= mesh.points.size()) {
-          throw std::out_of_range("uX9mD2bKhT :: triangle vertex index is out of range");
-        }
-        const glm::vec3 edge0      = transformedPoints[triangle.index1] - transformedPoints[triangle.index0];
-        const glm::vec3 edge1      = transformedPoints[triangle.index2] - transformedPoints[triangle.index0];
-        const glm::vec3 faceNormal = glm::cross(edge1, edge0);
-        normals[triangle.index0] += faceNormal;
-        normals[triangle.index1] += faceNormal;
-        normals[triangle.index2] += faceNormal;
-
-        nextIndices.push_back(baseVertex + triangle.index0);
-        nextIndices.push_back(baseVertex + triangle.index1);
-        nextIndices.push_back(baseVertex + triangle.index2);
-      }
-
-      for (size_t pointIndex = 0; pointIndex < transformedPoints.size(); ++pointIndex) {
-        const glm::vec3 normal =
-            glm::dot(normals[pointIndex], normals[pointIndex]) <= 0.0F ? glm::vec3(0.0F, 0.0F, 1.0F) : glm::normalize(normals[pointIndex]);
-        nextVertices.push_back(Vertex{transformedPoints[pointIndex], normal, materialColor});
-      }
-    }
-
-    vertices_ = std::move(nextVertices);
-    indices_  = std::move(nextIndices);
+    GeometryData geometry = vulkan_pipeline::buildShapeGroupGeometry(meshes, materials, shapes);
+    vertices_             = std::move(geometry.vertices);
+    indices_              = std::move(geometry.indices);
     recreateGeometryBuffers();
   }
 
@@ -942,60 +859,17 @@ namespace app {
 
   void VulkanInit::recordCommandBuffer(const VkCommandBuffer commandBuffer, const uint32_t imageIndex) const
   {
-    // Параметры начала записи command buffer Vulkan.
-    VkCommandBufferBeginInfo beginInfo{};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO; // Тип структуры начала записи command buffer.
-  
-    // Начинаем запись command buffer Vulkan.
-    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS) {
-      throw std::runtime_error("qN5eZ8rHsB :: failed to begin recording command buffer");
-    }
-  
-    // Параметры начала render pass Vulkan.
-    VkRenderPassBeginInfo renderPassInfo{};
-    renderPassInfo.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO; // Тип структуры начала render pass.
-    renderPassInfo.renderPass        = renderPass_;                              // Render pass, который нужно начать.
-    renderPassInfo.framebuffer       = swapChainFramebuffers_[imageIndex];       // Framebuffer для текущего изображения swap-chain.
-    renderPassInfo.renderArea.offset = {0, 0};                                   // Начало области рендеринга.
-    renderPassInfo.renderArea.extent = swapChainExtent_;                         // Размер области рендеринга.
-  
-    // Цвет очистки Vulkan.
-    constexpr VkClearValue clearColor = {{{0.02F, 0.03F, 0.05F, 1.0F}}};
-    renderPassInfo.clearValueCount    = 1;           // Количество значений очистки attachments.
-    renderPassInfo.pClearValues       = &clearColor; // Цвет, которым очищается color attachment.
-  
-    // Начинаем render pass Vulkan.
-    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-    // Привязываем графический pipeline Vulkan.
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline_);
-
-    if (vertexBuffer_ == VK_NULL_HANDLE || indexBuffer_ == VK_NULL_HANDLE || indices_.empty()) {
-      vkCmdEndRenderPass(commandBuffer);
-      if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
-        throw std::runtime_error("wJ4tK6mPxV :: failed to record command buffer");
-      }
-      return;
-    }
-  
-    // Vertex buffer Vulkan для привязки к pipeline.
-    const VkBuffer vertexBuffers[]   = {vertexBuffer_};
-    // Смещения vertex buffer Vulkan.
-    constexpr VkDeviceSize offsets[] = {0};
-    // Привязываем vertex buffer Vulkan.
-    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-    // Привязываем index buffer Vulkan.
-    vkCmdBindIndexBuffer(commandBuffer, indexBuffer_, 0, VK_INDEX_TYPE_UINT32);
-    // Передаем матрицы трансформации в push constants Vulkan.
-    vkCmdPushConstants(commandBuffer, pipelineLayout_, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(PushConstants), &pushConstants_);
-    // Отправляем индексированную команду рисования Vulkan.
-    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices_.size()), 1, 0, 0, 0);
-    // Завершаем render pass Vulkan.
-    vkCmdEndRenderPass(commandBuffer);
-  
-    // Завершаем запись command buffer Vulkan.
-    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
-      throw std::runtime_error("wJ4tK6mPxV :: failed to record command buffer");
-    }
+    vulkan_pipeline::recordCommandBuffer(commandBuffer,
+                                         imageIndex,
+                                         renderPass_,
+                                         swapChainFramebuffers_,
+                                         swapChainExtent_,
+                                         graphicsPipeline_,
+                                         vertexBuffer_,
+                                         indexBuffer_,
+                                         indices_,
+                                         pipelineLayout_,
+                                         pushConstants_);
   }
 
   void VulkanInit::createSyncObjects()

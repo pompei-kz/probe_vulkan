@@ -46,7 +46,6 @@ namespace app {
     std::vector<cmd::Shape>                         shapes;
   };
 
-  // TODO let it be pure abstract class
   struct LightVk
   {
     virtual ~LightVk() = default;
