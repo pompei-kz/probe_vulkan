@@ -224,19 +224,50 @@ TEST(PopulateWithSpheraFull, ZeroNorthPoleDirectionThrows)
 
 namespace {
 
-  // Expected vertex count: (heightSegments + 1) rings of radialSegments points,
-  // plus one center vertex per closed base.
-  size_t expectedCylinderPointCount(const int radialSegments, const int heightSegments, const bool open1, const bool open2)
+  constexpr float CYL_EPS = 1e-6F;
+
+  // Expected vertex count: each ring has radialSegments points, except a zero-radius end
+  // ring that collapses to a single apex vertex; plus one center vertex per closed, non-apex base.
+  size_t expectedCylinderPointCount(const float radius1,
+                                    const float radius2,
+                                    const int   radialSegments,
+                                    const int   heightSegments,
+                                    const bool  open1,
+                                    const bool  open2)
   {
-    return static_cast<size_t>(heightSegments + 1) * static_cast<size_t>(radialSegments) //
-         + static_cast<size_t>(open1 ? 0 : 1) + static_cast<size_t>(open2 ? 0 : 1);
+    const bool apex1 = radius1 <= CYL_EPS;
+    const bool apex2 = radius2 <= CYL_EPS;
+
+    size_t points = 0;
+    for (int ring = 0; ring <= heightSegments; ++ring) {
+      const bool apexRing = (ring == 0 && apex1) || (ring == heightSegments && apex2);
+      points += apexRing ? 1U : static_cast<size_t>(radialSegments);
+    }
+    points += static_cast<size_t>(!open1 && !apex1 ? 1 : 0) + static_cast<size_t>(!open2 && !apex2 ? 1 : 0);
+    return points;
   }
 
-  // Expected triangle count: 2 per side segment, plus one fan (radialSegments triangles) per closed base.
-  size_t expectedCylinderTriangleCount(const int radialSegments, const int heightSegments, const bool open1, const bool open2)
+  // Expected triangle count: 2 per side segment (a segment touching an apex contributes only a
+  // single fan of radialSegments triangles), plus one fan per closed, non-apex base.
+  size_t expectedCylinderTriangleCount(const float radius1,
+                                       const float radius2,
+                                       const int   radialSegments,
+                                       const int   heightSegments,
+                                       const bool  open1,
+                                       const bool  open2)
   {
-    return static_cast<size_t>(heightSegments) * static_cast<size_t>(radialSegments) * 2U //
-         + (static_cast<size_t>(open1 ? 0 : 1) + static_cast<size_t>(open2 ? 0 : 1)) * static_cast<size_t>(radialSegments);
+    const bool apex1 = radius1 <= CYL_EPS;
+    const bool apex2 = radius2 <= CYL_EPS;
+
+    size_t side = 0;
+    for (int ring = 0; ring < heightSegments; ++ring) {
+      const bool touchesApex = (ring == 0 && apex1) || (ring + 1 == heightSegments && apex2);
+      side += touchesApex ? static_cast<size_t>(radialSegments) : static_cast<size_t>(radialSegments) * 2U;
+    }
+
+    const size_t caps = static_cast<size_t>(!open1 && !apex1 ? radialSegments : 0) //
+                      + static_cast<size_t>(!open2 && !apex2 ? radialSegments : 0);
+    return side + caps;
   }
 
   // Perpendicular distance from a point to the cylinder axis line (center1 -> center2).
@@ -269,21 +300,22 @@ namespace {
 // ---------------------------------------------------------------------------
 TEST(PopulateWithCylinderFull, ClosedCylinderProducesExpectedCounts)
 {
-  constexpr int  radialSegments = 12;
-  constexpr int  heightSegments = 4;
-  constexpr bool open1          = false;
-  constexpr bool open2          = false;
+  constexpr int   radialSegments = 12;
+  constexpr int   heightSegments = 4;
+  constexpr float radius         = 2.0F;
+  constexpr bool  open1          = false;
+  constexpr bool  open2          = false;
 
   cmd::Mesh mesh;
 
   //
   //
-  gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 5}, 2.0F, radialSegments, heightSegments, open1, open2);
+  gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 5}, radius, radius, radialSegments, heightSegments, open1, open2);
   //
   //
 
-  EXPECT_EQ(mesh.points.size(), expectedCylinderPointCount(radialSegments, heightSegments, open1, open2));
-  EXPECT_EQ(mesh.triangles.size(), expectedCylinderTriangleCount(radialSegments, heightSegments, open1, open2));
+  EXPECT_EQ(mesh.points.size(), expectedCylinderPointCount(radius, radius, radialSegments, heightSegments, open1, open2));
+  EXPECT_EQ(mesh.triangles.size(), expectedCylinderTriangleCount(radius, radius, radialSegments, heightSegments, open1, open2));
 }
 
 // ---------------------------------------------------------------------------
@@ -303,17 +335,17 @@ TEST(PopulateWithCylinderFull, OpenFlagsRemoveCaps)
 
   //
   //
-  gen::populateWithCylinder(&bothOpen, c1, c2, 1.0F, radialSegments, heightSegments, true, true);
-  gen::populateWithCylinder(&oneOpen, c1, c2, 1.0F, radialSegments, heightSegments, true, false);
-  gen::populateWithCylinder(&closed, c1, c2, 1.0F, radialSegments, heightSegments, false, false);
+  gen::populateWithCylinder(&bothOpen, c1, c2, 1.0F, 1.0F, radialSegments, heightSegments, true, true);
+  gen::populateWithCylinder(&oneOpen, c1, c2, 1.0F, 1.0F, radialSegments, heightSegments, true, false);
+  gen::populateWithCylinder(&closed, c1, c2, 1.0F, 1.0F, radialSegments, heightSegments, false, false);
   //
   //
 
-  EXPECT_EQ(bothOpen.points.size(), expectedCylinderPointCount(radialSegments, heightSegments, true, true));
-  EXPECT_EQ(bothOpen.triangles.size(), expectedCylinderTriangleCount(radialSegments, heightSegments, true, true));
+  EXPECT_EQ(bothOpen.points.size(), expectedCylinderPointCount(1.0F, 1.0F, radialSegments, heightSegments, true, true));
+  EXPECT_EQ(bothOpen.triangles.size(), expectedCylinderTriangleCount(1.0F, 1.0F, radialSegments, heightSegments, true, true));
 
-  EXPECT_EQ(oneOpen.points.size(), expectedCylinderPointCount(radialSegments, heightSegments, true, false));
-  EXPECT_EQ(oneOpen.triangles.size(), expectedCylinderTriangleCount(radialSegments, heightSegments, true, false));
+  EXPECT_EQ(oneOpen.points.size(), expectedCylinderPointCount(1.0F, 1.0F, radialSegments, heightSegments, true, false));
+  EXPECT_EQ(oneOpen.triangles.size(), expectedCylinderTriangleCount(1.0F, 1.0F, radialSegments, heightSegments, true, false));
 
   // Each closed cap adds exactly radialSegments triangles compared with a fully open tube.
   EXPECT_EQ(closed.triangles.size(), bothOpen.triangles.size() + 2U * static_cast<size_t>(radialSegments));
@@ -334,7 +366,7 @@ TEST(PopulateWithCylinderFull, OpenTubePointsLieOnSideSurface)
 
   //
   //
-  gen::populateWithCylinder(&mesh, c1, c2, radius, 16, 5, true, true);
+  gen::populateWithCylinder(&mesh, c1, c2, radius, radius, 16, 5, true, true);
   //
   //
 
@@ -359,7 +391,7 @@ TEST(PopulateWithCylinderFull, ClosedCapsAddBaseCenters)
 
   //
   //
-  gen::populateWithCylinder(&mesh, c1, c2, 1.5F, 10, 2, false, false);
+  gen::populateWithCylinder(&mesh, c1, c2, 1.5F, 1.5F, 10, 2, false, false);
   //
   //
 
@@ -379,7 +411,7 @@ TEST(PopulateWithCylinderFull, OpenBaseHasNoCenterVertex)
 
   //
   //
-  gen::populateWithCylinder(&mesh, c1, c2, 1.0F, 12, 3, true, false);
+  gen::populateWithCylinder(&mesh, c1, c2, 1.0F, 1.0F, 12, 3, true, false);
   //
   //
 
@@ -397,7 +429,7 @@ TEST(PopulateWithCylinderFull, AllTriangleIndicesAreInRange)
 
   //
   //
-  gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{2, 0, 0}, 1.0F, 9, 4, false, false);
+  gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{2, 0, 0}, 1.0F, 1.0F, 9, 4, false, false);
   //
   //
 
@@ -426,8 +458,8 @@ TEST(PopulateWithCylinderSimple, ClosedAlongOzCenteredAtOrigin)
   //
   //
 
-  EXPECT_EQ(mesh.points.size(), expectedCylinderPointCount(radialSegments, heightSegments, false, false));
-  EXPECT_EQ(mesh.triangles.size(), expectedCylinderTriangleCount(radialSegments, heightSegments, false, false));
+  EXPECT_EQ(mesh.points.size(), expectedCylinderPointCount(1.0F, 1.0F, radialSegments, heightSegments, false, false));
+  EXPECT_EQ(mesh.triangles.size(), expectedCylinderTriangleCount(1.0F, 1.0F, radialSegments, heightSegments, false, false));
 
   // Both caps are closed, so their center vertices sit on the Oz axis at +/- height/2.
   EXPECT_TRUE(containsPoint(mesh.points, glm::vec3{0, 0, -height * 0.5F}));
@@ -440,11 +472,11 @@ TEST(PopulateWithCylinderSimple, ClosedAlongOzCenteredAtOrigin)
 TEST(PopulateWithCylinderFull, ReusingMeshClearsPreviousData)
 {
   cmd::Mesh mesh;
-  gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 8}, 1.0F, 20, 6, false, false);
-  gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 2}, 1.0F, 5, 1, true, true);
+  gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 8}, 1.0F, 1.0F, 20, 6, false, false);
+  gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 2}, 1.0F, 1.0F, 5, 1, true, true);
 
-  EXPECT_EQ(mesh.points.size(), expectedCylinderPointCount(5, 1, true, true));
-  EXPECT_EQ(mesh.triangles.size(), expectedCylinderTriangleCount(5, 1, true, true));
+  EXPECT_EQ(mesh.points.size(), expectedCylinderPointCount(1.0F, 1.0F, 5, 1, true, true));
+  EXPECT_EQ(mesh.triangles.size(), expectedCylinderTriangleCount(1.0F, 1.0F, 5, 1, true, true));
 }
 
 // ---------------------------------------------------------------------------
@@ -454,19 +486,30 @@ TEST(PopulateWithCylinderFull, NullTargetThrows)
 {
   //
   //
-  EXPECT_THROW(gen::populateWithCylinder(nullptr, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, 1.0F, 8, 2, false, false), std::invalid_argument);
+  EXPECT_THROW(gen::populateWithCylinder(nullptr, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, 1.0F, 1.0F, 8, 2, false, false), std::invalid_argument);
   //
   //
 }
 
-TEST(PopulateWithCylinderFull, NonPositiveRadiusThrows)
+TEST(PopulateWithCylinderFull, NegativeRadiusThrows)
 {
   cmd::Mesh mesh;
 
   //
   //
-  EXPECT_THROW(gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, 0.0F, 8, 2, false, false), std::invalid_argument);
-  EXPECT_THROW(gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, -1.0F, 8, 2, false, false), std::invalid_argument);
+  EXPECT_THROW(gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, -1.0F, 1.0F, 8, 2, false, false), std::invalid_argument);
+  EXPECT_THROW(gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, 1.0F, -1.0F, 8, 2, false, false), std::invalid_argument);
+  //
+  //
+}
+
+TEST(PopulateWithCylinderFull, BothRadiiZeroThrows)
+{
+  cmd::Mesh mesh;
+
+  //
+  //
+  EXPECT_THROW(gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, 0.0F, 0.0F, 8, 2, false, false), std::invalid_argument);
   //
   //
 }
@@ -477,7 +520,7 @@ TEST(PopulateWithCylinderFull, TooFewRadialSegmentsThrows)
 
   //
   //
-  EXPECT_THROW(gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, 1.0F, 2, 2, false, false), std::invalid_argument);
+  EXPECT_THROW(gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, 1.0F, 1.0F, 2, 2, false, false), std::invalid_argument);
   //
   //
 }
@@ -488,7 +531,7 @@ TEST(PopulateWithCylinderFull, TooFewHeightSegmentsThrows)
 
   //
   //
-  EXPECT_THROW(gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, 1.0F, 8, 0, false, false), std::invalid_argument);
+  EXPECT_THROW(gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 1}, 1.0F, 1.0F, 8, 0, false, false), std::invalid_argument);
   //
   //
 }
@@ -499,7 +542,110 @@ TEST(PopulateWithCylinderFull, EqualBaseCentersThrow)
 
   //
   //
-  EXPECT_THROW(gen::populateWithCylinder(&mesh, glm::vec3{1, 2, 3}, glm::vec3{1, 2, 3}, 1.0F, 8, 2, false, false), std::invalid_argument);
+  EXPECT_THROW(gen::populateWithCylinder(&mesh, glm::vec3{1, 2, 3}, glm::vec3{1, 2, 3}, 1.0F, 1.0F, 8, 2, false, false), std::invalid_argument);
   //
   //
+}
+
+// ===========================================================================
+// populateWithCylinder - cone behavior (one radius is zero)
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// A zero radius collapses that base to an apex vertex; counts follow the apex rule.
+// ---------------------------------------------------------------------------
+TEST(PopulateWithCylinderCone, ZeroRadius1ProducesApexCounts)
+{
+  constexpr int radialSegments = 12;
+  constexpr int heightSegments = 3;
+
+  const glm::vec3 c1{0, 0, 0};
+  const glm::vec3 c2{0, 0, 5};
+
+  cmd::Mesh mesh;
+
+  //
+  //
+  gen::populateWithCylinder(&mesh, c1, c2, 0.0F, 2.0F, radialSegments, heightSegments, false, false);
+  //
+  //
+
+  EXPECT_EQ(mesh.points.size(), expectedCylinderPointCount(0.0F, 2.0F, radialSegments, heightSegments, false, false));
+  EXPECT_EQ(mesh.triangles.size(), expectedCylinderTriangleCount(0.0F, 2.0F, radialSegments, heightSegments, false, false));
+
+  // The apex sits exactly at center1; the opposite (closed) base keeps its cap center.
+  EXPECT_TRUE(containsPoint(mesh.points, c1));
+  EXPECT_TRUE(containsPoint(mesh.points, c2));
+}
+
+// ---------------------------------------------------------------------------
+// An apex base is never capped, so its open flag has no effect on the result.
+// ---------------------------------------------------------------------------
+TEST(PopulateWithCylinderCone, ApexEndIgnoresOpenFlag)
+{
+  const glm::vec3 c1{0, 0, 0};
+  const glm::vec3 c2{0, 0, 4};
+
+  cmd::Mesh apexClosed;
+  cmd::Mesh apexOpen;
+
+  //
+  //
+  gen::populateWithCylinder(&apexClosed, c1, c2, 0.0F, 2.0F, 10, 2, false, false);
+  gen::populateWithCylinder(&apexOpen, c1, c2, 0.0F, 2.0F, 10, 2, true, false);
+  //
+  //
+
+  EXPECT_EQ(apexClosed.points.size(), apexOpen.points.size());
+  EXPECT_EQ(apexClosed.triangles.size(), apexOpen.triangles.size());
+}
+
+// ---------------------------------------------------------------------------
+// A cone must not contain degenerate triangles, and every index must be valid.
+// ---------------------------------------------------------------------------
+TEST(PopulateWithCylinderCone, NoDegenerateTrianglesAndIndicesInRange)
+{
+  cmd::Mesh mesh;
+
+  //
+  //
+  gen::populateWithCylinder(&mesh, glm::vec3{0, 0, 0}, glm::vec3{0, 0, 3}, 2.0F, 0.0F, 9, 4, false, false);
+  //
+  //
+
+  const auto pointCount = static_cast<uint32_t>(mesh.points.size());
+  for (const cmd::TriangleIdx &tri : mesh.triangles) {
+    EXPECT_LT(tri.index0, pointCount);
+    EXPECT_LT(tri.index1, pointCount);
+    EXPECT_LT(tri.index2, pointCount);
+    EXPECT_NE(tri.index0, tri.index1);
+    EXPECT_NE(tri.index1, tri.index2);
+    EXPECT_NE(tri.index0, tri.index2);
+  }
+
+  // Apex at center2; base center1 is closed.
+  EXPECT_TRUE(containsPoint(mesh.points, glm::vec3{0, 0, 3}));
+}
+
+// ---------------------------------------------------------------------------
+// A near-zero radius (within epsilon) is also treated as an apex.
+// ---------------------------------------------------------------------------
+TEST(PopulateWithCylinderCone, NearZeroRadiusIsApex)
+{
+  constexpr int radialSegments = 8;
+  constexpr int heightSegments = 2;
+
+  const glm::vec3 c1{0, 0, 0};
+  const glm::vec3 c2{0, 0, 4};
+
+  cmd::Mesh mesh;
+
+  //
+  //
+  gen::populateWithCylinder(&mesh, c1, c2, 1e-7F, 1.0F, radialSegments, heightSegments, false, false);
+  //
+  //
+
+  EXPECT_EQ(mesh.points.size(), expectedCylinderPointCount(0.0F, 1.0F, radialSegments, heightSegments, false, false));
+  EXPECT_EQ(mesh.triangles.size(), expectedCylinderTriangleCount(0.0F, 1.0F, radialSegments, heightSegments, false, false));
 }

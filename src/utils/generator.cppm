@@ -5,6 +5,7 @@ module;
 #include <glm/vec3.hpp>
 #include <numbers>
 #include <stdexcept>
+#include <vector>
 
 export module generator;
 import cmd_pipeline;
@@ -127,7 +128,10 @@ export namespace gen {
     }
   }
 
-  void populateWithCylinder(cmd::Mesh *, glm::vec3, glm::vec3, float, int, int, bool, bool);
+  void populateWithCylinder(cmd::Mesh *, glm::vec3, glm::vec3, float, float, int, int, bool, bool);
+
+  // Радиус, который меньше или равен этому значению, считается нулевым - основание вырождается в вершину (конус).
+  constexpr float CYLINDER_RADIUS_EPSILON = 1e-6F;
 
   /**
    * Populates `target` with a closed cylinder centered in the beginning of coordinate system and its axis along Oz.
@@ -144,19 +148,23 @@ export namespace gen {
                             const int   heightSegments)
   {
     const float halfHeight = height * 0.5F;
-    populateWithCylinder(target, glm::vec3{0, 0, -halfHeight}, glm::vec3{0, 0, halfHeight}, radius, radialSegments, heightSegments, false, false);
+    populateWithCylinder(target, glm::vec3{0, 0, -halfHeight}, glm::vec3{0, 0, halfHeight}, radius, radius, radialSegments, heightSegments, false, false);
   }
 
   /**
-   * Populates `target` with a cylinder spanning between two base centers.
+   * Populates `target` with a cylinder / truncated cone spanning between two base centers.
    *
-   * The cylinder axis goes from `center1` to `center2`; its height equals the distance
-   * between them. Each base can be capped or left open independently.
+   * The axis goes from `center1` to `center2`; its height equals the distance between them.
+   * The radius is interpolated linearly along the axis from `radius1` at `center1` to `radius2`
+   * at `center2`. If one of the radii is zero (within `CYLINDER_RADIUS_EPSILON`), that base
+   * collapses to a single apex vertex and the result is a cone (such a base never has a cap).
+   * Each non-degenerate base can be capped or left open independently.
    *
    * @param target target to populate
    * @param center1 center of the first base
    * @param center2 center of the second base
-   * @param radius radius of cylinder
+   * @param radius1 radius of the base at `center1` (zero means an apex at `center1`)
+   * @param radius2 radius of the base at `center2` (zero means an apex at `center2`)
    * @param radialSegments segment count around the axis
    * @param heightSegments segment count along the axis
    * @param open1 if true, the base at `center1` is left open (no cap); if false, it is capped
@@ -165,7 +173,8 @@ export namespace gen {
   void populateWithCylinder(cmd::Mesh  *target,         //
                             glm::vec3   center1,        //
                             glm::vec3   center2,        //
-                            const float radius,         //
+                            const float radius1,        //
+                            const float radius2,        //
                             const int   radialSegments, //
                             const int   heightSegments, //
                             const bool  open1,          //
@@ -174,14 +183,23 @@ export namespace gen {
     if (target == nullptr) {
       throw std::invalid_argument("qD2hN7vKsP :: target mesh is null");
     }
-    if (radius <= 0.0F) {
-      throw std::invalid_argument("wL5cR1mTxB :: cylinder radius must be positive");
+    if (radius1 < 0.0F) {
+      throw std::invalid_argument("wL5cR1mTxB :: cylinder radius1 must be non-negative");
+    }
+    if (radius2 < 0.0F) {
+      throw std::invalid_argument("sV9yB3nKqW :: cylinder radius2 must be non-negative");
     }
     if (radialSegments < 3) {
       throw std::invalid_argument("tK3sB9yMwL :: cylinder radialSegments must be at least 3");
     }
     if (heightSegments < 1) {
       throw std::invalid_argument("nF6xD2cRpV :: cylinder heightSegments must be at least 1");
+    }
+
+    const bool apex1 = radius1 <= CYLINDER_RADIUS_EPSILON;
+    const bool apex2 = radius2 <= CYLINDER_RADIUS_EPSILON;
+    if (apex1 && apex2) {
+      throw std::invalid_argument("pH7cM4vTxR :: cylinder radius1 and radius2 must not both be zero");
     }
 
     const glm::vec3 axis = center2 - center1;
@@ -195,76 +213,108 @@ export namespace gen {
     const glm::vec3 xAxis  = glm::normalize(glm::cross(helper, zAxis));
     const glm::vec3 yAxis  = glm::normalize(glm::cross(zAxis, xAxis));
 
+    // Является ли кольцо вырожденным в вершину (только крайние кольца могут быть таковыми).
+    const auto ringIsApex = [apex1, apex2, heightSegments](const int ring) {
+      return (ring == 0 && apex1) || (ring == heightSegments && apex2);
+    };
+
+    const bool cap1 = !open1 && !apex1;
+    const bool cap2 = !open2 && !apex2;
+
     target->points.clear();
     target->triangles.clear();
 
-    const size_t ringCount = static_cast<size_t>(heightSegments) + 1U;
-    const size_t capCount  = static_cast<size_t>(open1 ? 0 : 1) + static_cast<size_t>(open2 ? 0 : 1);
-    target->points.reserve(ringCount * static_cast<size_t>(radialSegments) + capCount);
-    target->triangles.reserve(static_cast<size_t>(heightSegments) * static_cast<size_t>(radialSegments) * 2U +
-                              capCount * static_cast<size_t>(radialSegments));
-
-    // Точки боковой поверхности: (heightSegments + 1) колец по radialSegments точек.
-    // Кольцо 0 лежит в основании center1, кольцо heightSegments - в основании center2.
+    // Точное число точек: сумма размеров колец (вершина - 1 точка, иначе radialSegments) плюс центры крышек.
+    size_t pointCount = 0;
     for (int ring = 0; ring <= heightSegments; ++ring) {
-      const float     offset = height * static_cast<float>(ring) / static_cast<float>(heightSegments);
-      const glm::vec3 base   = center1 + zAxis * offset;
+      pointCount += ringIsApex(ring) ? 1U : static_cast<size_t>(radialSegments);
+    }
+    pointCount += static_cast<size_t>(cap1 ? 1 : 0) + static_cast<size_t>(cap2 ? 1 : 0);
+
+    target->points.reserve(pointCount);
+    target->triangles.reserve(static_cast<size_t>(heightSegments) * static_cast<size_t>(radialSegments) * 2U +
+                              static_cast<size_t>(cap1 ? radialSegments : 0) + static_cast<size_t>(cap2 ? radialSegments : 0));
+
+    // Точки колец: кольцо 0 в основании center1, кольцо heightSegments - в основании center2.
+    // Радиус интерполируется линейно вдоль оси. Вырожденное кольцо хранит одну точку - вершину.
+    std::vector<uint32_t> ringStart(static_cast<size_t>(heightSegments) + 1U);
+    for (int ring = 0; ring <= heightSegments; ++ring) {
+      ringStart[ring] = static_cast<uint32_t>(target->points.size());
+
+      const float     t      = static_cast<float>(ring) / static_cast<float>(heightSegments);
+      const float     ringRadius = radius1 + (radius2 - radius1) * t;
+      const glm::vec3 base   = center1 + zAxis * (height * t);
+
+      if (ringIsApex(ring)) {
+        target->points.push_back(base);
+        continue;
+      }
 
       for (int radial = 0; radial < radialSegments; ++radial) {
         const float     phi             = 2.0F * PI * static_cast<float>(radial) / static_cast<float>(radialSegments);
         const glm::vec3 radialDirection = std::cos(phi) * xAxis + std::sin(phi) * yAxis;
-        target->points.push_back(base + radius * radialDirection);
+        target->points.push_back(base + ringRadius * radialDirection);
       }
     }
 
-    // Центральные точки крышек добавляются только если соответствующее основание закрыто.
+    // Центральные точки крышек добавляются только для закрытых невырожденных оснований.
     uint32_t center2Index = 0;
-    if (!open2) {
+    if (cap2) {
       center2Index = static_cast<uint32_t>(target->points.size());
       target->points.push_back(center2);
     }
     uint32_t center1Index = 0;
-    if (!open1) {
+    if (cap1) {
       center1Index = static_cast<uint32_t>(target->points.size());
       target->points.push_back(center1);
     }
 
-    const auto ringIndex = [radialSegments](const int ring, const int radial) {
-      const int wrappedRadial = radial % radialSegments;
-      return static_cast<uint32_t>(ring * radialSegments + wrappedRadial);
+    const auto ringPoint = [&ringStart, &ringIsApex, radialSegments](const int ring, const int radial) {
+      if (ringIsApex(ring)) {
+        return ringStart[ring];
+      }
+      return ringStart[ring] + static_cast<uint32_t>(radial % radialSegments);
     };
 
-    // Боковая поверхность: два треугольника на каждый сегмент, нормалями наружу.
+    // Добавляет треугольник, пропуская вырожденные (с совпадающими вершинами у апекса).
+    const auto pushTriangle = [target](const uint32_t a, const uint32_t b, const uint32_t c) {
+      if (a != b && b != c && a != c) {
+        target->triangles.push_back(cmd::TriangleIdx{a, b, c});
+      }
+    };
+
+    // Боковая поверхность: два треугольника на сегмент, нормалями наружу.
+    // У вырожденного кольца совпадающие вершины автоматически отбрасываются, образуя веер конуса.
     for (int ring = 0; ring < heightSegments; ++ring) {
       for (int radial = 0; radial < radialSegments; ++radial) {
-        const uint32_t lower0 = ringIndex(ring, radial);
-        const uint32_t lower1 = ringIndex(ring, radial + 1);
-        const uint32_t upper0 = ringIndex(ring + 1, radial);
-        const uint32_t upper1 = ringIndex(ring + 1, radial + 1);
+        const uint32_t lower0 = ringPoint(ring, radial);
+        const uint32_t lower1 = ringPoint(ring, radial + 1);
+        const uint32_t upper0 = ringPoint(ring + 1, radial);
+        const uint32_t upper1 = ringPoint(ring + 1, radial + 1);
 
-        target->triangles.push_back(cmd::TriangleIdx{lower0, upper0, lower1});
-        target->triangles.push_back(cmd::TriangleIdx{lower1, upper0, upper1});
+        pushTriangle(lower0, upper0, lower1);
+        pushTriangle(lower1, upper0, upper1);
       }
     }
 
     // Крышка основания center2, нумерация наружу (нормаль вдоль center2 - center1).
-    if (!open2) {
+    if (cap2) {
       for (int radial = 0; radial < radialSegments; ++radial) {
         target->triangles.push_back(cmd::TriangleIdx{
             center2Index,
-            ringIndex(heightSegments, radial + 1),
-            ringIndex(heightSegments, radial),
+            ringPoint(heightSegments, radial + 1),
+            ringPoint(heightSegments, radial),
         });
       }
     }
 
     // Крышка основания center1, нумерация наружу (нормаль вдоль center1 - center2).
-    if (!open1) {
+    if (cap1) {
       for (int radial = 0; radial < radialSegments; ++radial) {
         target->triangles.push_back(cmd::TriangleIdx{
             center1Index,
-            ringIndex(0, radial),
-            ringIndex(0, radial + 1),
+            ringPoint(0, radial),
+            ringPoint(0, radial + 1),
         });
       }
     }
