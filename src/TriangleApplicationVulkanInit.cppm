@@ -14,7 +14,9 @@ module;
 #include <array>
 #include <cstdint>
 #include <cstring>
+#include <iostream>
 #include <limits>
+#include <ostream>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -249,6 +251,31 @@ namespace app {
 
   void VulkanInit::createInstance()
   {
+    {
+      uint32_t extensionCount = 0;
+      vkEnumerateInstanceExtensionProperties(
+          nullptr,
+          &extensionCount,
+          nullptr);
+
+      std::vector<VkExtensionProperties> extensions(extensionCount);
+
+      vkEnumerateInstanceExtensionProperties(
+          nullptr,
+          &extensionCount,
+          extensions.data());
+
+      for (const auto& ext : extensions)
+      {
+        std::cout << "ZT9Fn6bsPg :: Instance extension "
+            << ext.extensionName
+            << " (specVersion="
+            << ext.specVersion
+            << ")\n";
+      }
+    }
+
+
     // Описание приложения для создания экземпляра Vulkan.
     VkApplicationInfo appInfo{};
     appInfo.sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO; // Тип структуры с информацией о приложении.
@@ -266,6 +293,10 @@ namespace app {
       throw std::runtime_error(std::string("hM4cV7nLxS :: ") + SDL_GetError());
     }
 
+    for (Uint32 i = 0; i < extensionCount; ++i) {
+      std::cout << "ApXprHf7BF :: extension " << *(extensions + i) << std::endl;
+    }
+
     // Параметры создания экземпляра Vulkan.
     VkInstanceCreateInfo createInfo{};
     createInfo.sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO; // Тип структуры создания экземпляра Vulkan.
@@ -274,8 +305,8 @@ namespace app {
     createInfo.ppEnabledExtensionNames = extensions;                             // Имена расширений экземпляра, нужных SDL.
 
     // Создаем экземпляр Vulkan.
-    if (vkCreateInstance(&createInfo, nullptr, &instance_) != VK_SUCCESS) {
-      throw std::runtime_error("uF2dK8wYpC :: failed to create Vulkan instance");
+    if (const VkResult vkResult = vkCreateInstance(&createInfo, nullptr, &instance_); vkResult != VK_SUCCESS) {
+      throw std::runtime_error(std::string("uF2dK8wYpC :: failed to create Vulkan instance: ") + util::VkResultToString(vkResult));
     }
   }
 
@@ -361,7 +392,19 @@ namespace app {
     // Получаем свойства семейств очередей Vulkan.
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 
+    std::cout << "U9Jj3uKKzk :: Queue Families:" << std::endl;
     for (uint32_t i = 0; i < queueFamilies.size(); ++i) {
+      const VkQueueFamilyProperties queueFamily = queueFamilies[i];
+      std::cout << "7CZDfSJqHM :: queueFamilyIndex = " << i << std::endl;
+      std::cout << "        queueCount                  = " << queueFamily.queueCount << std::endl;
+      std::cout << "        timestampValidBits          = " << queueFamily.timestampValidBits << std::endl;
+      std::cout << "        minImageTransferGranularity = " << util::VkExtent3D_to_str(queueFamily.minImageTransferGranularity) << std::endl;
+      util::printVkQueueFlags("        QueueFlags ", queueFamily.queueFlags);
+    }
+    std::cout << std::endl;
+
+    for (uint32_t i = 0; i < queueFamilies.size(); ++i) {
+
       if ((queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0) {
         indices.graphicsFamily = i;
       }
@@ -558,6 +601,8 @@ namespace app {
     if (vkCreateSwapchainKHR(device_, &createInfo, nullptr, &swapChain_) != VK_SUCCESS) {
       throw std::runtime_error("xV5qN8cTpJ :: failed to create swap chain");
     }
+
+    std::cout << util::nowStr() << " FAwd0DAZ7B :: SwapChain created   " << swapChain_ << std::endl;
 
     // Запрашиваем количество изображений swap-chain Vulkan.
     vkGetSwapchainImagesKHR(device_, swapChain_, &imageCount, nullptr);
@@ -1050,6 +1095,8 @@ namespace app {
       vkDestroyImageView(device_, imageView, nullptr);
     }
     swapChainImageViews_.clear();
+
+    std::cout << util::nowStr() << " tYRIvGh7Y9 :: SwapChain destroyed " << swapChain_ << std::endl;
 
     // Уничтожаем swap-chain Vulkan.
     vkDestroySwapchainKHR(device_, swapChain_, nullptr);

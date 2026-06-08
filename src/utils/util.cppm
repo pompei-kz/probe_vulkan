@@ -1,16 +1,52 @@
 module;
 
 #include <SDL3/SDL.h>
-#include <shaderc/shaderc.hpp>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
-#include <cstdint>
+#include <iostream>
+#include <shaderc/shaderc.hpp>
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <vulkan/vulkan.h>
 
 export module util;
+
+namespace {
+  void printVkQueueFlag0(bool                   &first, //
+                         const std::string_view &prefix,
+                         const std::string      &spaces,
+                         const VkQueueFlags      queueFlags,
+                         const VkQueueFlagBits   flagBit,
+                         const char             *display)
+  {
+    if (queueFlags & flagBit) {
+      std::cout << (first ? prefix : spaces) << display << std::endl;
+      first = false;
+    }
+  }
+
+  void printVkQueueFlags0(const std::string_view &prefix, const VkQueueFlags queueFlags)
+  {
+    const std::string spaces(prefix.length(), ' ');
+
+    bool first = true;
+
+    printVkQueueFlag0(first, prefix, spaces, queueFlags, VK_QUEUE_GRAPHICS_BIT, "VK_QUEUE_GRAPHICS_BIT");
+    printVkQueueFlag0(first, prefix, spaces, queueFlags, VK_QUEUE_COMPUTE_BIT, "VK_QUEUE_COMPUTE_BIT");
+    printVkQueueFlag0(first, prefix, spaces, queueFlags, VK_QUEUE_TRANSFER_BIT, "VK_QUEUE_TRANSFER_BIT");
+    printVkQueueFlag0(first, prefix, spaces, queueFlags, VK_QUEUE_SPARSE_BINDING_BIT, "VK_QUEUE_SPARSE_BINDING_BIT");
+    printVkQueueFlag0(first, prefix, spaces, queueFlags, VK_QUEUE_PROTECTED_BIT, "VK_QUEUE_PROTECTED_BIT");
+    printVkQueueFlag0(first, prefix, spaces, queueFlags, VK_QUEUE_VIDEO_DECODE_BIT_KHR, "VK_QUEUE_VIDEO_DECODE_BIT_KHR");
+    printVkQueueFlag0(first, prefix, spaces, queueFlags, VK_QUEUE_VIDEO_ENCODE_BIT_KHR, "VK_QUEUE_VIDEO_ENCODE_BIT_KHR");
+    printVkQueueFlag0(first, prefix, spaces, queueFlags, VK_QUEUE_OPTICAL_FLOW_BIT_NV, "VK_QUEUE_OPTICAL_FLOW_BIT_NV");
+
+    if (first) {
+      std::cout << prefix << "(NO BITS)" << std::endl;
+    }
+  }
+} // namespace
 
 export namespace util {
 
@@ -66,6 +102,35 @@ export namespace util {
     const std::string                    time       = std::format("{:%Y-%m-%d %H:%M:%S}.{:06}", time_point, count);
 
     return time;
+  }
+
+  void printVkQueueFlags(std::string_view prefix, VkQueueFlags queueFlags)
+  {
+    printVkQueueFlags0(prefix, queueFlags);
+  }
+
+  std::string VkExtent3D_to_str(VkExtent3D value)
+  {
+    return std::format(
+        "VkExtent3D{{{}x{}, depth={}}}",
+        value.width,
+        value.height,
+        value.depth
+    );
+  }
+
+  const char* VkResultToString(VkResult r)
+  {
+    switch (r) {
+    case VK_SUCCESS: return "VK_SUCCESS";
+    case VK_ERROR_OUT_OF_HOST_MEMORY: return "VK_ERROR_OUT_OF_HOST_MEMORY";
+    case VK_ERROR_OUT_OF_DEVICE_MEMORY: return "VK_ERROR_OUT_OF_DEVICE_MEMORY";
+    case VK_ERROR_INITIALIZATION_FAILED: return "VK_ERROR_INITIALIZATION_FAILED";
+    case VK_ERROR_LAYER_NOT_PRESENT: return "VK_ERROR_LAYER_NOT_PRESENT";
+    case VK_ERROR_EXTENSION_NOT_PRESENT: return "VK_ERROR_EXTENSION_NOT_PRESENT";
+    case VK_ERROR_INCOMPATIBLE_DRIVER: return "VK_ERROR_INCOMPATIBLE_DRIVER";
+    default: return "UNKNOWN";
+    }
   }
 
 } // namespace util
