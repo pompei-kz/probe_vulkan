@@ -165,7 +165,7 @@ export namespace model {
 
     // Динамические ресурсы (обновляются каждый кадр).
     std::array<RingSlot, MAX_FRAMES_IN_FLIGHT> instanceRing{};
-    std::vector<DrawBatch>                      drawBatches;
+    std::vector<DrawBatch>                     drawBatches;
   };
 
   struct PipelineVk
@@ -199,11 +199,11 @@ export namespace model {
   // Данные, передаваемые в запись command buffer для одного pipeline.
   struct PipelineRenderData
   {
-    VkDescriptorSet              materialSet    = VK_NULL_HANDLE;
-    VkBuffer                     vertexBuffer   = VK_NULL_HANDLE;
-    VkBuffer                     indexBuffer    = VK_NULL_HANDLE;
-    VkBuffer                     instanceBuffer = VK_NULL_HANDLE;
-    const std::vector<DrawBatch> *batches       = nullptr;
+    VkDescriptorSet               materialSet    = VK_NULL_HANDLE;
+    VkBuffer                      vertexBuffer   = VK_NULL_HANDLE;
+    VkBuffer                      indexBuffer    = VK_NULL_HANDLE;
+    VkBuffer                      instanceBuffer = VK_NULL_HANDLE;
+    const std::vector<DrawBatch> *batches        = nullptr;
   };
 
   struct QueueFamilyIndices
